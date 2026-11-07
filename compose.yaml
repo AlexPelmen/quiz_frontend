@@ -1,0 +1,8 @@
+name: quiz-admin
+services:
+  frontend:
+    build: .
+    ports:
+      - "127.0.0.1:3000:80"
+    environment:
+      API_UPSTREAM: ${API_UPSTREAM:-host.docker.internal:8080}
