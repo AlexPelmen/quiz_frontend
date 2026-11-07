@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Alert, Button, Layout, Menu, Space, Tag, Tooltip } from 'antd';
-import { CustomerServiceOutlined, DatabaseOutlined, DownloadOutlined, PlayCircleOutlined, SettingOutlined, CodeOutlined, AppstoreOutlined, TeamOutlined, WarningOutlined, ReloadOutlined } from '@ant-design/icons';
+import { CustomerServiceOutlined, DatabaseOutlined, DownloadOutlined, PlayCircleOutlined, SettingOutlined, CodeOutlined, AppstoreOutlined, TeamOutlined, WarningOutlined, ReloadOutlined, TagOutlined } from '@ant-design/icons';
 import { useQuery } from '@tanstack/react-query';
 import { Catalog } from './Catalog';
 import { Downloads, Parsing, ParsingErrors, Settings } from './Operations';
@@ -8,6 +8,7 @@ import { date, request } from './api';
 import { useAction } from './shared';
 import { Packs } from './Packs';
 import { Console } from './Console';
+import { Tags } from './Tags';
 
 const sections = [
   { key: 'artists', icon: <TeamOutlined />, label: 'Исполнители' },
@@ -17,6 +18,7 @@ const sections = [
   { key: 'parsing-errors', icon: <WarningOutlined />, label: 'Ошибки парсинга' },
   { key: 'downloads', icon: <DownloadOutlined />, label: 'Загрузки' },
   { key: 'packs', icon: <AppstoreOutlined />, label: 'Квиз-пакеты' },
+  { key: 'tags', icon: <TagOutlined />, label: 'Теги' },
   { key: 'settings', icon: <SettingOutlined />, label: 'Настройки' },
   { key: 'console', icon: <CodeOutlined />, label: 'API-консоль' },
 ];
@@ -45,7 +47,7 @@ export function App() {
       <Layout.Content className="content">
         {health.error && <Alert className="connection-error" type="error" showIcon title="Нет соединения с сервером" description="Проверьте запуск backend и PostgreSQL. Повторная проверка выполняется автоматически." />}
         {isCatalog ? <Catalog key={section} resource={section} search={search} />
-          : section === 'parsing' ? <Parsing /> : section === 'parsing-errors' ? <ParsingErrors /> : section === 'downloads' ? <Downloads /> : section === 'packs' ? <Packs /> : section === 'settings' ? <Settings /> : <Console />}
+          : section === 'parsing' ? <Parsing /> : section === 'parsing-errors' ? <ParsingErrors /> : section === 'downloads' ? <Downloads /> : section === 'packs' ? <Packs /> : section === 'tags' ? <Tags /> : section === 'settings' ? <Settings /> : <Console />}
       </Layout.Content><Layout.Footer className="footer">Music Quiz · От каталога исполнителей до готового раунда</Layout.Footer>
     </Layout>
   </Layout>;

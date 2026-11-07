@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { date, Entity, fileURL, request } from './api';
 import { questionAudioURL, QuizPack } from './quiz';
 import { Failure, PageTitle, Refresh, useAction } from './shared';
+import { useTags } from './Tags';
 
 export function Packs() {
   const [page, setPage] = useState(1);
@@ -12,24 +13,27 @@ export function Packs() {
   const [editing, setEditing] = useState<Entity | 'new' | null>(null);
   const [form] = Form.useForm();
   const action = useAction();
+  const tags = useTags();
+  const tagOptions = tags.data?.map(tag => ({ value: tag.name, label: tag.name }));
   const query = useQuery({ queryKey: ['quiz-packs', page], queryFn: () => request<Entity[]>(`/quiz-packs?limit=20&offset=${(page - 1) * 20}`) });
   const detail = useQuery({ queryKey: ['quiz-pack', selected], queryFn: () => request<QuizPack>(`/quiz-packs/${selected}`), enabled: !!selected });
   const edit = (pack: Entity | 'new') => { form.resetFields(); form.setFieldsValue(pack === 'new' ? { tags: [] } : pack); setEditing(pack); };
   return <><PageTitle title="Квиз-пакеты" subtitle="До 10 раундов по 10 вопросов · без повторов исполнителей"><Refresh onClick={() => void query.refetch()} /><Button type="primary" icon={<PlusOutlined />} onClick={() => edit('new')}>Создать пакет</Button></PageTitle>
-    <Failure error={query.error} /><div className="panel"><Table<Entity> rowKey="id" loading={query.isFetching} dataSource={query.data} pagination={false} columns={[
+    <Failure error={query.error || tags.error} /><div className="panel"><Table<Entity> rowKey="id" loading={query.isFetching} dataSource={query.data} pagination={false} columns={[
       { title: 'Пакет', dataIndex: 'name', render: (name, row) => <Button type="link" onClick={() => setSelected(row.id)}>{name}</Button> },
       { title: 'Описание', dataIndex: 'description' }, { title: 'Создан', dataIndex: 'created_at', render: date },
       { title: 'Действия', render: (_, row) => <Space><Button onClick={() => edit(row)}>Изменить</Button><Popconfirm title="Удалить пакет?" onConfirm={() => action.mutateAsync({ path: `/quiz-packs/${row.id}`, method: 'DELETE' })}><Button danger>Удалить</Button></Popconfirm></Space> },
     ]} /><div className="pager"><Button disabled={page === 1} onClick={() => setPage(page - 1)}>Назад</Button>Страница {page}<Button disabled={(query.data?.length || 0) < 20} onClick={() => setPage(page + 1)}>Далее</Button></div></div>
     <Modal open={!!editing} title={editing === 'new' ? 'Составить квиз-пакет' : 'Описание пакета'} onCancel={() => setEditing(null)} onOk={() => form.submit()} confirmLoading={action.isPending}>
+      <Failure error={action.error} />
       <Form form={form} layout="vertical" onFinish={values => {
         const { name, description, tags, artist_tag } = values;
         const body = { name, description, tags, ...(editing === 'new' && artist_tag ? { artist_tag } : {}) };
         action.mutate({ path: `/quiz-packs${editing && editing !== 'new' ? `/${editing.id}` : ''}`, method: editing === 'new' ? 'POST' : 'PATCH', body }, { onSuccess: () => setEditing(null) });
       }}>
         <Form.Item name="name" label="Название" rules={[{ required: true, whitespace: true }]}><Input /></Form.Item>
-        <Form.Item name="description" label="Описание"><Input.TextArea /></Form.Item><Form.Item name="tags" label="Теги пакета"><Select mode="tags" /></Form.Item>
-        {editing === 'new' && <Form.Item name="artist_tag" label="Тег исполнителей (необязательно)"><Input placeholder="Например, rock" /></Form.Item>}
+        <Form.Item name="description" label="Описание"><Input.TextArea /></Form.Item><Form.Item name="tags" label="Теги пакета" extra="Управление списком — в разделе «Теги»"><Select mode="multiple" showSearch={{ optionFilterProp: 'label' }} options={tagOptions} loading={tags.isPending} disabled={tags.isError} /></Form.Item>
+        {editing === 'new' && <Form.Item name="artist_tag" label="Тег исполнителей (необязательно)"><Select allowClear showSearch={{ optionFilterProp: 'label' }} options={tagOptions} loading={tags.isPending} disabled={tags.isError} /></Form.Item>}
         <Typography.Text type="secondary">Если данных недостаточно, пакет будет короче. Для первого раунда нужны минимум 10 разных исполнителей с готовым аудио.</Typography.Text>
       </Form>
     </Modal>

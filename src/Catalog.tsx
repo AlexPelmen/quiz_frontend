@@ -6,6 +6,7 @@ import { useQuery } from '@tanstack/react-query';
 import { date, Entity, request } from './api';
 import { CatalogDetail, type CatalogResource } from './CatalogDetail';
 import { Failure, PageTitle, Refresh, Status, statusLabel, useAction } from './shared';
+import { useTags } from './Tags';
 
 const pageSize = 20;
 const names = { artists: 'Исполнители', albums: 'Альбомы', tracks: 'Треки' };
@@ -27,6 +28,8 @@ export function Catalog({ resource, search }: { resource: CatalogResource; searc
   const [form] = Form.useForm();
   const formArtistID = Form.useWatch<string>('artist_id', form);
   const action = useAction();
+  const tags = useTags();
+  const tagOptions = tags.data?.map(tag => ({ value: tag.name, label: tag.name }));
 
   const updateRoute = (values: Record<string, string | undefined>) => {
     for (const [key, value] of Object.entries({ page: undefined, ...values })) {
@@ -74,8 +77,8 @@ export function Catalog({ resource, search }: { resource: CatalogResource; searc
   const submit = (values: Record<string, unknown>) => {
     if (!editing) return;
     const allowed = resource === 'artists' ? ['name', 'points', 'tags', 'country', 'full_name', 'artists']
-      : resource === 'albums' ? ['name', 'points', 'release_date', ...(editing === 'new' ? ['artist_id'] : [])]
-        : ['name', 'points', ...(editing === 'new' ? ['artist_id', 'album_id'] : [])];
+      : resource === 'albums' ? ['name', 'points', 'tags', 'release_date', ...(editing === 'new' ? ['artist_id'] : [])]
+        : ['name', 'points', 'tags', ...(editing === 'new' ? ['artist_id', 'album_id'] : [])];
     const body = Object.fromEntries(Object.entries(values).filter(([key, value]) =>
       allowed.includes(key) && value !== undefined && (editing === 'new' || JSON.stringify(value) !== JSON.stringify(editing[key]))));
     if (editing !== 'new' && Object.keys(body).length === 0) {
@@ -118,9 +121,7 @@ export function Catalog({ resource, search }: { resource: CatalogResource; searc
     columns.push({ title: resource === 'tracks' ? 'Статус аудио' : 'Статус', dataIndex: 'status',
       ...sortColumn('status'), render: value => <Status value={value} /> });
   }
-  if (resource === 'artists') {
-    columns.push({ title: 'Теги', dataIndex: 'tags', render: (tags: string[]) => tags?.map(tag => <Tag key={tag}>{tag}</Tag>) });
-  }
+  columns.push({ title: 'Теги', dataIndex: 'tags', render: (tags: string[]) => tags?.map(tag => <Tag key={tag}>{tag}</Tag>) });
   columns.push(
     { title: 'Добавлен', dataIndex: 'created_at', ...sortColumn('created_at'), render: date },
     { title: 'Действия', width: resource === 'artists' ? 240 : 125, render: (_, row) => <Space wrap>
@@ -137,12 +138,12 @@ export function Catalog({ resource, search }: { resource: CatalogResource; searc
     <PageTitle title={names[resource]} subtitle="Ваш музыкальный каталог. Оценки влияют на выбор вопросов.">
       <Refresh onClick={() => void query.refetch()} /><Button type="primary" icon={<PlusOutlined />} onClick={() => startEdit('new')}>Добавить</Button>
     </PageTitle>
-    <Failure error={query.error || artists.error || albums.error} />
+    <Failure error={query.error || artists.error || albums.error || tags.error} />
     <div className="panel">
       <div className="toolbar catalog-filters">
         {resource === 'artists' ? <>
           <Input.Search key={`name:${params.get('name')}`} defaultValue={params.get('name') || ''} aria-label="Поиск исполнителя по названию" placeholder="Поиск по названию" allowClear onSearch={value => updateRoute({ name: value.trim() })} />
-          <Input.Search key={`tag:${params.get('tag')}`} defaultValue={params.get('tag') || ''} aria-label="Фильтр по тегу" placeholder="Фильтр по тегу" allowClear onSearch={value => updateRoute({ tag: value.trim() })} />
+          <Select aria-label="Фильтр по тегу" placeholder="Фильтр по тегу" value={params.get('tag') || undefined} allowClear showSearch={{ optionFilterProp: 'label' }} options={tagOptions} onChange={value => updateRoute({ tag: value })} />
         </> : <Select aria-label="Поиск по исполнителю" placeholder="Поиск по исполнителю" value={artistID} loading={artists.isPending} showSearch={{ optionFilterProp: 'label' }} allowClear options={artistOptions} onChange={value => updateRoute({ artist_id: value })} />}
         {resource === 'tracks' && <>
           <Select aria-label="Поиск по альбому" placeholder="Поиск по альбому" value={albumID} loading={albums.isPending} showSearch={{ optionFilterProp: 'label' }} allowClear options={albumOptions} onChange={value => updateRoute({ album_id: value })} />
@@ -171,8 +172,8 @@ export function Catalog({ resource, search }: { resource: CatalogResource; searc
           extra="0 — исключить из генерации, 100 — максимальная оценка" rules={[{ required: true }]}>
           <InputNumber min={0} max={100} step={0.01} style={{ width: '100%' }} />
         </Form.Item>
+        <Form.Item name="tags" label="Теги" extra="Управление списком — в разделе «Теги»"><Select mode="multiple" showSearch={{ optionFilterProp: 'label' }} options={tagOptions} loading={tags.isPending} disabled={tags.isError} /></Form.Item>
         {resource === 'artists' ? <>
-          <Form.Item name="tags" label="Теги"><Select mode="tags" tokenSeparators={[',']} /></Form.Item>
           <Form.Item name="full_name" label="Полное название"><Input /></Form.Item>
           <Form.Item name="country" label="Страна"><Input /></Form.Item>
           <Form.Item name="artists" label="Участники группы"><Select mode="tags" tokenSeparators={[',']} /></Form.Item>

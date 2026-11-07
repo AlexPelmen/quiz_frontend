@@ -41,6 +41,7 @@ function CatalogRecord({ resource, row }: { resource: CatalogResource; row: Enti
   const fields: NonNullable<DescriptionsProps['items']> = [
     { key: 'points', label: resource === 'albums' ? 'Узнаваемость обложки' : 'Известность', children: `${row.points} / 100` },
     { key: 'guess_num', label: 'Показов в завершённых раундах', children: String(row.guess_num ?? '—') },
+    { key: 'tags', label: 'Теги', children: row.tags?.length ? row.tags.map(tag => <Tag key={tag}>{tag}</Tag>) : '—' },
   ];
   if (row.status) fields.push({
     key: 'status', label: resource === 'tracks' ? 'Статус аудио' : 'Статус', children: <Status value={row.status} />,
@@ -50,7 +51,6 @@ function CatalogRecord({ resource, row }: { resource: CatalogResource; row: Enti
       { key: 'full_name', label: 'Полное название', children: String(row.full_name || '—') },
       { key: 'country', label: 'Страна', children: String(row.country || '—') },
       { key: 'artists', label: 'Участники группы', children: Array.isArray(row.artists) && row.artists.length ? row.artists.join(', ') : '—' },
-      { key: 'tags', label: 'Теги', children: row.tags?.length ? row.tags.map(tag => <Tag key={tag}>{tag}</Tag>) : '—' },
     );
   } else {
     fields.push({ key: 'artist', label: 'Исполнитель', children: artist.data?.name || (artist.isFetching ? 'Загрузка…' : '—') });
