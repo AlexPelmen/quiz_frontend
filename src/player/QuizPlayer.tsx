@@ -329,6 +329,7 @@ export function QuizPlayer() {
             </div>
             <Progress aria-label="Прогресс раунда" percent={step.position / step.round.questions.length * 100} showInfo={false} strokeColor="#b294ff" />
             <h1 ref={heading} tabIndex={-1}>{step.question.primary_text}</h1>
+            <p>{rule?.instructions}</p>
             {revealed ? <><Splash answer /><QuizAnswer question={step.question} roundType={step.round.type} /></> : <>
               {hint && <div className="mq-hint">{hint}</div>}
               {step.round.type === 'artist_by_cover'

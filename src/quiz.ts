@@ -57,6 +57,7 @@ export const questionCoverURL = (packId: string, number: number) =>
   `/api/v1/quiz-packs/${encodeURIComponent(packId)}/questions/${number}/cover`;
 
 export function questionHint(text: string, roundType: string) {
+  if (roundType === 'artist_cities' || roundType === 'artist_alphabet') return '';
   // В сохранённых пакетах согласные могли быть записаны как подчёркивания.
   return roundType === 'track_vowels' ? text.replaceAll('_', '').replace(/\s+/g, ' ').trim().toLowerCase() : text;
 }
@@ -88,7 +89,7 @@ const roundRules: Record<string, { name: string; instructions: string; label: st
   },
   artist_initial: {
     name: 'Первая буква',
-    instructions: 'Послушайте трек и назовите исполнителя. Подсказка под вопросом — первая буква его имени.',
+    instructions: 'Послушайте трек и назовите исполнителя. Подсказка показывает первую букву на латинице и кириллице.',
     label: 'По первой букве',
     symbol: 'Б',
   },
@@ -100,7 +101,7 @@ const roundRules: Record<string, { name: string; instructions: string; label: st
   },
   artist_cities: {
     name: 'Игра в города',
-    instructions: 'Угадайте исполнителей по трекам. В латинской записи каждый следующий начинается с последней буквы предыдущего.',
+    instructions: 'Угадайте исполнителей по трекам. В латинской записи каждый следующий начинается с последней буквы предыдущего. Артикли The, A и An пропускаются.',
     label: 'Цепочка',
     symbol: '↪',
   },

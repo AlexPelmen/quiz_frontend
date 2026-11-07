@@ -78,7 +78,7 @@ export function Settings() {
   const [form] = Form.useForm();
   return <><PageTitle title="Настройки" subtitle="Параметры парсинга, загрузок и последовательность раундов"><Refresh onClick={() => void query.refetch()} /></PageTitle>
     <Failure error={query.error} /><Card title="Конфигурация сервиса">
-      <Alert type="info" showIcon title="Настройки хранятся в PostgreSQL" description="k_parse × Points определяет число треков для импорта. k_popularity задаёт скорость изменения известности после раунда. Секрет Genius задаётся в backend/.env." />
+      <Alert type="info" showIcon title="Настройки хранятся в PostgreSQL" description="k_parse × Points определяет число треков для импорта. k_popularity задаёт базовый шаг известности, min_popularity_delta — минимальное изменение после затухания. Секрет Genius задаётся в backend/.env." />
       {query.data && <Form key={query.dataUpdatedAt} form={form} layout="vertical" initialValues={{ json: pretty(query.data) }} onFinish={values => action.mutate({ path: '/settings', method: 'PATCH', body: JSON.parse(values.json) })}>
         <Form.Item className="spaced" name="json" label="JSON настроек" rules={[{ validator: (_, value) => validateJSON(value) }]}><Input.TextArea autoSize={{ minRows: 18, maxRows: 32 }} className="code-input" /></Form.Item>
         <Button htmlType="submit" type="primary" loading={action.isPending}>Сохранить настройки</Button>
