@@ -20,10 +20,13 @@ const sections = [
   { key: 'settings', icon: <SettingOutlined />, label: 'Настройки' },
   { key: 'console', icon: <CodeOutlined />, label: 'API-консоль' },
 ];
-const currentSection = () => sections.some(s => s.key === location.hash.slice(1)) ? location.hash.slice(1) : 'artists';
+const currentRoute = () => location.hash.slice(1);
 export function App() {
-  const [section, setSection] = useState(currentSection);
-  useEffect(() => { const update = () => setSection(currentSection()); addEventListener('hashchange', update); return () => removeEventListener('hashchange', update); }, []);
+  const [route, setRoute] = useState(currentRoute);
+  const [key, search] = route.split('?', 2);
+  const section = sections.some(s => s.key === key) ? key : 'artists';
+  const isCatalog = section === 'artists' || section === 'albums' || section === 'tracks';
+  useEffect(() => { const update = () => setRoute(currentRoute()); addEventListener('hashchange', update); return () => removeEventListener('hashchange', update); }, []);
   const health = useQuery({ queryKey: ['ready'], queryFn: async () => { const r = await fetch('/ready'); if (!r.ok) throw new Error('API недоступен'); return r.json(); }, refetchInterval: 10000 });
   const quota = useQuery({ queryKey: ['genius-quota'], queryFn: () => request<{ limit: number; remaining: number; reset_at: string; observed_at: string } | null>('/genius-quota'), refetchInterval: 10000 });
   const action = useAction();
@@ -41,7 +44,7 @@ export function App() {
       <Tag color={health.isSuccess ? 'success' : 'error'}>{health.isSuccess ? 'Сервис подключён' : 'Нет связи с API'}</Tag></Space></Layout.Header>
       <Layout.Content className="content">
         {health.error && <Alert className="connection-error" type="error" showIcon title="Нет соединения с сервером" description="Проверьте запуск backend и PostgreSQL. Повторная проверка выполняется автоматически." />}
-        {['artists', 'albums', 'tracks'].includes(section) ? <Catalog key={section} resource={section as 'artists' | 'albums' | 'tracks'} />
+        {isCatalog ? <Catalog key={section} resource={section} search={search} />
           : section === 'parsing' ? <Parsing /> : section === 'parsing-errors' ? <ParsingErrors /> : section === 'downloads' ? <Downloads /> : section === 'packs' ? <Packs /> : section === 'settings' ? <Settings /> : <Console />}
       </Layout.Content><Layout.Footer className="footer">Music Quiz · От каталога исполнителей до готового раунда</Layout.Footer>
     </Layout>

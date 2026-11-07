@@ -12,9 +12,11 @@ export interface Entity {
 }
 
 export async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const headers = new Headers(options.headers);
+  if (!headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
   const response = await fetch(`/api/v1${path}`, {
     ...options,
-    headers: { 'Content-Type': 'application/json', ...options.headers },
+    headers,
   });
   if (!response.ok) {
     const body = await response.json().catch(() => null);
@@ -24,6 +26,9 @@ export async function request<T>(path: string, options: RequestInit = {}): Promi
 }
 
 export function save<T>(path: string, method: string, body?: unknown) {
+  if (body instanceof Blob) {
+    return request<T>(path, { method, body, headers: { 'Content-Type': 'application/octet-stream' } });
+  }
   return request<T>(path, { method, ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
 }
 

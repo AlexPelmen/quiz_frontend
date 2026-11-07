@@ -6,11 +6,13 @@ import { save } from './api';
 const labels: Record<string, string> = {
   created: 'Новый', processing: 'В обработке', parsed: 'Импортирован', errored: 'Ошибка',
   pending: 'В очереди', finished: 'Завершено', manual: 'Вручную', running: 'Выполняется',
+  missing: 'Нет записи',
 };
+export const statusLabel = (value: string) => labels[value] || value;
 export function Status({ value }: { value?: string }) {
   const color = value === 'errored' ? 'error' : value === 'finished' || value === 'parsed' ? 'success'
     : value === 'manual' ? 'warning' : 'processing';
-  return value ? <Tag color={color}>{labels[value] || value}</Tag> : null;
+  return value ? <Tag color={value === 'missing' ? 'default' : color}>{statusLabel(value)}</Tag> : null;
 }
 export function Failure({ error }: { error: Error | null }) {
   return error ? <Alert showIcon type="error" title={error.message} style={{ marginBottom: 16 }} /> : null;
