@@ -4,6 +4,8 @@ export interface QuizPackSummary {
   description: string;
   tags: string[] | null;
   created_at: string;
+  difficulty?: string;
+  cover_download_id?: string | null;
 }
 
 export interface QuizPack extends QuizPackSummary {
@@ -37,6 +39,15 @@ export interface RoundResult {
   r: number;
   n: number;
   answers: Record<string, boolean>;
+}
+
+export const difficultyLabels: Record<string, string> = { easy: 'Лёгкий', medium: 'Средний', hard: 'Сложный' };
+
+const ranks = ['Днище', 'Говнарь', 'Лох', 'Чушпан', 'Вася', 'Кренделёк', 'Башка', 'Бывалый', 'Суровый', 'Божество'];
+
+export function quizScore(correct: number, total: number) {
+  const points = total ? Math.round(correct * 100 / total) : 0;
+  return { points, rank: ranks[Math.min(9, Math.floor(points / 10))] };
 }
 
 export const questionAudioURL = (packId: string, number: number) =>
@@ -81,7 +92,33 @@ const roundRules: Record<string, { name: string; instructions: string; label: st
     label: 'По первой букве',
     symbol: 'Б',
   },
+  artist_by_albums: {
+    name: 'По списку альбомов',
+    instructions: 'Назовите исполнителя, выпустившего эти альбомы.',
+    label: 'По альбомам',
+    symbol: '▤',
+  },
+  artist_cities: {
+    name: 'Игра в города',
+    instructions: 'Угадайте исполнителей по трекам. В латинской записи каждый следующий начинается с последней буквы предыдущего.',
+    label: 'Цепочка',
+    symbol: '↪',
+  },
+  artist_growth: {
+    name: 'На вырост',
+    instructions: 'Угадайте исполнителей по трекам. В каждом следующем названии больше букв. Пробелы, цифры и знаки не считаются.',
+    label: 'На вырост',
+    symbol: '↗',
+  },
+  artist_alphabet: {
+    name: 'Алфавит',
+    instructions: 'Угадайте исполнителей по трекам. Первая буква каждого следующего названия идёт дальше по латинскому алфавиту.',
+    label: 'Алфавит',
+    symbol: 'A',
+  },
 };
+
+export const roundOptions = Object.entries(roundRules).map(([value, rule]) => ({ value, label: rule.name }));
 
 export const ruleFor = (type: string) => roundRules[type] ?? {
   name: 'Музыкальный раунд',

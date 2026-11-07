@@ -7,7 +7,7 @@ import {
 } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { fileURL, request, save } from '../api';
-import { questionAudioURL, questionCoverURL, questionHint, ruleFor } from '../quiz';
+import { difficultyLabels, questionAudioURL, questionCoverURL, questionHint, quizScore, ruleFor } from '../quiz';
 import type { QuizPack, QuizPackSummary, QuizQuestion, QuizRound, RoundResult } from '../quiz';
 import { QuizAnswer } from './QuizAnswer';
 import { useQuizAudio } from './useQuizAudio';
@@ -112,6 +112,8 @@ export function QuizPlayer() {
   const rounds = (pack?.rounds ?? []).filter(round => round.questions.length > 0);
   const total = rounds.reduce((sum, round) => sum + round.questions.length, 0);
   const step = game?.steps[game.index];
+  const correct = step?.kind === 'finish' ? Object.values(game?.answers ?? {}).filter(Boolean).length : 0;
+  const score = quizScore(correct, total);
   const question = step?.kind === 'question' ? step.question : null;
   const rule = step && step.kind !== 'finish' ? ruleFor(step.round.type) : null;
   const hint = step?.kind === 'question' ? questionHint(step.question.secondary_text, step.round.type) : '';
@@ -254,12 +256,14 @@ export function QuizPlayer() {
               {page === 1 && <Button href="/#packs">Открыть студию пакетов</Button>}
             </Empty>}
             <div className="mq-pack-grid">{packs.data?.map((item, index) => <Card className="mq-pack-card" key={item.id}
-              cover={<div className="mq-poster" data-tone={index % 3} aria-hidden="true">
+              cover={item.cover_download_id ? <img className="mq-pack-cover" src={fileURL(item.cover_download_id)} alt="" />
+                : <div className="mq-poster" data-tone={index % 3} aria-hidden="true">
                 <span>ПАКЕТ {numberLabel((page - 1) * pageSize + index + 1)}</span>
                 <b>{posterSymbols[index % posterSymbols.length]}</b>
                 <i>♪</i>
               </div>}>
               <h3>{item.name}</h3>
+              <Tag>{difficultyLabels[item.difficulty ?? 'medium']}</Tag>
               <p>{item.description || 'Музыкальные вопросы и подсказки.'}</p>
               <Tags tags={item.tags} />
               <Button block onClick={() => setSelected(item.id)} aria-label={`Открыть пакет «${item.name}»`}
@@ -283,6 +287,8 @@ export function QuizPlayer() {
             <Splash />
             <div className="mq-kicker"><CustomerServiceOutlined /> ПАКЕТ КВИЗА</div>
             <h1 ref={heading} tabIndex={-1}>{pack.name}</h1>
+            {pack.cover_download_id && <img className="mq-detail-cover" src={fileURL(pack.cover_download_id)} alt="Обложка пакета" />}
+            <Tag>{difficultyLabels[pack.difficulty ?? 'medium']}</Tag>
             {pack.description && <p>{pack.description}</p>}
             <Tags tags={pack.tags} />
             <div className="mq-pack-stats">
@@ -372,8 +378,9 @@ export function QuizPlayer() {
             <Splash answer />
             <div className="mq-kicker">КВИЗ ЗАВЕРШЁН</div>
             <div className="mq-round-symbol" aria-hidden="true">✦</div>
-            <h1 ref={heading} tabIndex={-1}>Спасибо!</h1>
-            <p>Вы дошли до конца квиза «{game.pack.name}».</p>
+            <h1 ref={heading} tabIndex={-1}>{score.points} из 100 очков</h1>
+            <p>Ваше звание — <strong>{score.rank}</strong></p>
+            <p>Угадано {correct} из {total} в квизе «{game.pack.name}».</p>
             <Button type="primary" size="large" icon={<UnorderedListOutlined />} onClick={goToCatalog}>К списку квизов</Button>
           </section>}
 

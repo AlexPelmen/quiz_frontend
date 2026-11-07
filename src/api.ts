@@ -13,7 +13,9 @@ export interface Entity {
 
 export async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const headers = new Headers(options.headers);
-  if (!headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
+  if (!headers.has('Content-Type') && !(options.body instanceof FormData)) {
+    headers.set('Content-Type', 'application/json');
+  }
   const response = await fetch(`/api/v1${path}`, {
     ...options,
     headers,
@@ -26,6 +28,7 @@ export async function request<T>(path: string, options: RequestInit = {}): Promi
 }
 
 export function save<T>(path: string, method: string, body?: unknown) {
+  if (body instanceof FormData) return request<T>(path, { method, body });
   if (body instanceof Blob) {
     return request<T>(path, { method, body, headers: { 'Content-Type': 'application/octet-stream' } });
   }
