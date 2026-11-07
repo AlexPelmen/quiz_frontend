@@ -39,7 +39,8 @@ function CatalogRecord({ resource, row }: { resource: CatalogResource; row: Enti
   const album = useEntity('albums', typeof row.album_id === 'string' ? row.album_id : undefined);
   const imageID = resource === 'artists' ? row.logo_download_id : row.cover_download_id;
   const fields: NonNullable<DescriptionsProps['items']> = [
-    { key: 'points', label: 'Интерес', children: `${row.points} / 100` },
+    { key: 'points', label: resource === 'albums' ? 'Узнаваемость обложки' : 'Известность', children: `${row.points} / 100` },
+    { key: 'guess_num', label: 'Показов в завершённых раундах', children: String(row.guess_num ?? '—') },
   ];
   if (row.status) fields.push({
     key: 'status', label: resource === 'tracks' ? 'Статус аудио' : 'Статус', children: <Status value={row.status} />,

@@ -21,7 +21,8 @@ export interface QuizQuestion {
   id: string;
   number: number;
   artist_id: string;
-  track_id: string;
+  track_id: string | null;
+  album_id: string | null;
   primary_text: string;
   secondary_text: string;
   answer: string;
@@ -30,6 +31,13 @@ export interface QuizQuestion {
   sound_download_id: string | null;
   trackStartSec: number | null;
   trackFinishSec: number | null;
+}
+
+export interface RoundResult {
+  attempt_id: string;
+  r: number;
+  n: number;
+  answers: Record<string, boolean>;
 }
 
 export const questionAudioURL = (packId: string, number: number) =>

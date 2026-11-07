@@ -7,7 +7,8 @@ import type { QuizQuestion } from '../quiz';
 
 const labels: Record<string, string> = { artist: 'Исполнитель', track: 'Трек', album: 'Альбом', release: 'Релиз' };
 
-async function trackAlbum(trackId: string, signal: AbortSignal) {
+async function trackAlbum(trackId: string | null, signal: AbortSignal) {
+  if (!trackId) return null;
   const track = await request<{ album_id: string | null }>(`/tracks/${encodeURIComponent(trackId)}`, { signal });
   if (!track.album_id) return null;
   return request<{ cover_download_id: string | null; release_date: string }>(

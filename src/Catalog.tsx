@@ -103,7 +103,7 @@ export function Catalog({ resource, search }: { resource: CatalogResource; searc
   const columns: TableColumnsType<Entity> = [
     { title: 'Название', dataIndex: 'name', ...sortColumn('name'), render: (name, row) =>
       <Button className="catalog-name" type="link" onClick={() => setDetailID(row.id)}>{name}</Button> },
-    { title: 'Интерес', dataIndex: 'points', ...sortColumn('points'), width: 120,
+    { title: resource === 'albums' ? 'Узнаваемость обложки' : 'Известность', dataIndex: 'points', ...sortColumn('points'), width: 160,
       render: value => <Tag color={value === 0 ? 'default' : 'purple'}>{value} / 100</Tag> },
   ];
   if (resource !== 'artists') {
@@ -167,8 +167,9 @@ export function Catalog({ resource, search }: { resource: CatalogResource; searc
       <Failure error={action.error} />
       <Form form={form} layout="vertical" onFinish={submit}>
         <Form.Item name="name" label="Название" rules={[{ required: true, whitespace: true, message: 'Введите название' }]}><Input maxLength={1000} /></Form.Item>
-        <Form.Item name="points" label="Интерес (Points)" extra="0 — исключить из генерации, 100 — максимальный интерес" rules={[{ required: true }]}>
-          <InputNumber min={0} max={100} precision={0} style={{ width: '100%' }} />
+        <Form.Item name="points" label={resource === 'albums' ? 'Узнаваемость обложки' : 'Известность'}
+          extra="0 — исключить из генерации, 100 — максимальная оценка" rules={[{ required: true }]}>
+          <InputNumber min={0} max={100} step={0.01} style={{ width: '100%' }} />
         </Form.Item>
         {resource === 'artists' ? <>
           <Form.Item name="tags" label="Теги"><Select mode="tags" tokenSeparators={[',']} /></Form.Item>

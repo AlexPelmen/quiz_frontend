@@ -1,14 +1,14 @@
 import { useEffect, useEffectEvent, useRef, useState } from 'react';
-import { Alert, Button, Card, Empty, Image, Modal, Progress, Spin, Tag } from 'antd';
+import { Alert, Button, Card, Empty, Image, Modal, Progress, Space, Spin, Tag } from 'antd';
 import {
   ArrowDownOutlined, ArrowLeftOutlined, ArrowRightOutlined, ArrowUpOutlined,
   CalendarOutlined, CustomerServiceOutlined, MutedOutlined, PauseOutlined,
   PlayCircleFilled, PlayCircleOutlined, ReloadOutlined, SoundOutlined, UnorderedListOutlined,
 } from '@ant-design/icons';
-import { useQuery } from '@tanstack/react-query';
-import { fileURL, request } from '../api';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { fileURL, request, save } from '../api';
 import { questionAudioURL, ruleFor } from '../quiz';
-import type { QuizPack, QuizPackSummary, QuizQuestion, QuizRound } from '../quiz';
+import type { QuizPack, QuizPackSummary, QuizQuestion, QuizRound, RoundResult } from '../quiz';
 import { QuizAnswer } from './QuizAnswer';
 import { useQuizAudio } from './useQuizAudio';
 import './player.css';
@@ -21,6 +21,7 @@ const wave = [10, 18, 12, 24, 32, 19, 26, 13, 22, 30, 16, 8];
 type Step =
   | { kind: 'round'; round: QuizRound }
   | { kind: 'question'; round: QuizRound; question: QuizQuestion; position: number }
+  | { kind: 'result'; round: QuizRound }
   | { kind: 'finish' };
 
 function gameSteps(rounds: QuizRound[]): Step[] {
@@ -28,11 +29,21 @@ function gameSteps(rounds: QuizRound[]): Step[] {
   for (const round of rounds) {
     steps.push({ kind: 'round', round });
     round.questions.forEach((question, index) => steps.push({ kind: 'question', round, question, position: index + 1 }));
+    steps.push({ kind: 'result', round });
   }
   return [...steps, { kind: 'finish' }];
 }
 
-type Game = { pack: QuizPack; steps: Step[]; index: number; revealed: Set<string> };
+type Game = {
+  pack: QuizPack;
+  steps: Step[];
+  index: number;
+  attemptId: string;
+  revealed: Set<string>;
+  answers: Partial<Record<string, boolean>>;
+  results: Partial<Record<string, RoundResult>>;
+  saved: Set<string>;
+};
 
 const numberLabel = (number: number) => String(number).padStart(2, '0');
 const timeLabel = (seconds: number) => `${Math.floor(seconds / 60)}:${numberLabel(Math.floor(seconds % 60))}`;
@@ -74,6 +85,18 @@ export function QuizPlayer() {
   const media = useRef<HTMLAudioElement>(null);
   const audio = useQuizAudio(media);
   const heading = useRef<HTMLHeadingElement>(null);
+  const queryClient = useQueryClient();
+  const submission = useMutation({
+    mutationFn: ({ roundId, result }: { roundId: string; result: RoundResult }) =>
+      save<void>(`/quiz-rounds/${encodeURIComponent(roundId)}/results`, 'POST', result),
+    onSuccess: (_, { roundId, result }) => {
+      setGame(current => current?.attemptId === result.attempt_id
+        ? { ...current, saved: new Set([...current.saved, roundId]) } : current);
+      for (const key of ['artists', 'albums', 'tracks', 'catalog-related']) {
+        void queryClient.invalidateQueries({ queryKey: [key] });
+      }
+    },
+  });
 
   const packs = useQuery({
     queryKey: ['quiz-packs', 'player', page],
@@ -92,6 +115,9 @@ export function QuizPlayer() {
   const question = step?.kind === 'question' ? step.question : null;
   const rule = step && step.kind !== 'finish' ? ruleFor(step.round.type) : null;
   const revealed = question !== null && (game?.revealed.has(question.id) ?? false);
+  const marked = question ? game?.answers[question.id] : undefined;
+  const result = step?.kind === 'result' ? game?.results[step.round.id] : undefined;
+  const resultSaved = step?.kind === 'result' && game?.saved.has(step.round.id);
   const clip = pack && question?.sound_download_id ? questionAudioURL(pack.id, question.number) : null;
   const screen = game ? `${game.pack.id}-${game.index}` : selected ? `pack-${selected}-${!!pack}` : 'catalog';
 
@@ -103,14 +129,34 @@ export function QuizPlayer() {
   }, [screen]);
 
   function move(offset: number) {
-    if (!game) return;
+    if (!game || submission.isPending) return;
+    if (offset > 0 && ((question && marked === undefined) || (result && !resultSaved))) return;
     const index = game.index + offset;
     const next = game.steps[index];
     if (!next) return;
     const url = next.kind === 'question' && next.question.sound_download_id
       ? questionAudioURL(game.pack.id, next.question.number) : null;
+    if (next.kind === 'result' && !game.results[next.round.id]) {
+      const answers: Record<string, boolean> = {};
+      for (const q of next.round.questions) {
+        const answer = game.answers[q.id];
+        if (answer === undefined) return;
+        answers[q.id] = answer;
+      }
+      const result = { attempt_id: game.attemptId, n: next.round.questions.length,
+        r: Object.values(answers).filter(Boolean).length, answers };
+      audio.load(null);
+      setGame({ ...game, index, results: { ...game.results, [next.round.id]: result } });
+      submission.mutate({ roundId: next.round.id, result });
+      return;
+    }
     audio.load(url, sound === true);
     setGame({ ...game, index });
+  }
+
+  function markAnswer(correct: boolean) {
+    if (!game || step?.kind !== 'question' || !revealed || game.results[step.round.id]) return;
+    setGame({ ...game, answers: { ...game.answers, [step.question.id]: correct } });
   }
 
   function showAnswer(open: boolean) {
@@ -128,6 +174,8 @@ export function QuizPlayer() {
   }
 
   function goToCatalog() {
+    if (submission.isPending) return;
+    submission.reset();
     audio.load(null);
     setGame(null);
     setSelected(null);
@@ -245,7 +293,8 @@ export function QuizPlayer() {
               {rounds.map(round => <li key={round.id}><span>{numberLabel(round.number)}</span>{ruleFor(round.type).name}</li>)}
             </ol> : <Alert showIcon type="info" title="В этом пакете нет вопросов." />}
             <Button size="large" type="primary" icon={<PlayCircleOutlined />} disabled={!total}
-              onClick={() => setGame({ pack, steps: gameSteps(rounds), index: 0, revealed: new Set() })}>Начать</Button>
+              onClick={() => setGame({ pack, steps: gameSteps(rounds), index: 0, attemptId: crypto.randomUUID(),
+                revealed: new Set(), answers: {}, results: {}, saved: new Set() })}>Начать</Button>
           </section>}
         </>}
 
@@ -296,6 +345,24 @@ export function QuizPlayer() {
               icon={revealed ? <ArrowUpOutlined /> : <ArrowDownOutlined />} onClick={() => showAnswer(!revealed)}>
               {revealed ? 'Скрыть ответ' : 'Показать ответ'}
             </Button>
+            {revealed && <Space wrap size="middle" role="group" aria-label="Угадали ответ?">
+              <Button size="large" type={marked === true ? 'primary' : 'default'} aria-pressed={marked === true}
+                disabled={!!game.results[step.round.id]} onClick={() => markAnswer(true)}>Угадали</Button>
+              <Button size="large" type={marked === false ? 'primary' : 'default'} aria-pressed={marked === false}
+                disabled={!!game.results[step.round.id]} onClick={() => markAnswer(false)}>Не угадали</Button>
+            </Space>}
+          </section>}
+
+          {step.kind === 'result' && result && <section className="mq-stage mq-round">
+            <div className="mq-kicker">РАУНД {numberLabel(step.round.number)}</div>
+            <h1 ref={heading} tabIndex={-1}>Угадано {result.r} из {result.n}</h1>
+            {submission.isPending && <div className="mq-status" role="status"><Spin size="small" /> Сохраняем результат…</div>}
+            {submission.isError && !resultSaved && <Alert type="error" showIcon title="Не удалось сохранить результат"
+              description={submission.error.message} />}
+            {resultSaved ? <Button type="primary" size="large" onClick={() => move(1)}>
+              {following?.kind === 'finish' ? 'Завершить квиз' : 'Следующий раунд'}
+            </Button> : !submission.isPending && <Button type="primary" size="large"
+              onClick={() => submission.mutate({ roundId: step.round.id, result })}>Повторить сохранение</Button>}
           </section>}
 
           {step.kind === 'finish' && <section className="mq-stage mq-round mq-finish">
@@ -308,13 +375,14 @@ export function QuizPlayer() {
           </section>}
 
           <div className="mq-game-controls">
-            <Button icon={<ArrowLeftOutlined />} disabled={game.index === 0} onClick={() => move(-1)}>Назад</Button>
+            <Button icon={<ArrowLeftOutlined />} disabled={game.index === 0 || submission.isPending} onClick={() => move(-1)}>Назад</Button>
             <span className="mq-key-hints"><span><kbd>←</kbd> <kbd>→</kbd> Навигация</span>
               {question && <><span><kbd>↓</kbd> Ответ</span><span><kbd>↑</kbd> Скрыть</span></>}
               {clip && <span><kbd>Пробел</kbd> Звук</span>}
             </span>
-            {step.kind === 'question' ? <Button type={revealed ? 'primary' : 'default'} onClick={() => move(1)}
-              icon={<ArrowRightOutlined />} iconPlacement="end">{following?.kind === 'finish' ? 'Завершить' : lastQuestion ? 'Следующий раунд' : 'Следующий вопрос'}</Button>
+            {step.kind === 'question' ? <Button type={marked === undefined ? 'default' : 'primary'}
+              disabled={marked === undefined} onClick={() => move(1)}
+              icon={<ArrowRightOutlined />} iconPlacement="end">{lastQuestion ? 'Завершить раунд' : 'Следующий вопрос'}</Button>
               : <span />}
           </div>
         </>}
