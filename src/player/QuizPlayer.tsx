@@ -7,7 +7,7 @@ import {
 } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { fileURL, request, save } from '../api';
-import { questionAudioURL, ruleFor } from '../quiz';
+import { questionAudioURL, questionCoverURL, questionHint, ruleFor } from '../quiz';
 import type { QuizPack, QuizPackSummary, QuizQuestion, QuizRound, RoundResult } from '../quiz';
 import { QuizAnswer } from './QuizAnswer';
 import { useQuizAudio } from './useQuizAudio';
@@ -70,11 +70,11 @@ function RecordArt() {
   </div>;
 }
 
-function QuizImage({ id }: { id: string }) {
+function QuizImage({ src }: { src: string }) {
   const [failed, setFailed] = useState(false);
   return failed
     ? <Alert showIcon type="warning" title="Изображение вопроса недоступно" />
-    : <Image className="mq-question-image" src={fileURL(id)} onError={() => setFailed(true)} alt="Изображение-подсказка к вопросу" preview={false} />;
+    : <Image className="mq-question-image" src={src} onError={() => setFailed(true)} alt="Изображение-подсказка к вопросу" preview={false} />;
 }
 
 export function QuizPlayer() {
@@ -114,6 +114,7 @@ export function QuizPlayer() {
   const step = game?.steps[game.index];
   const question = step?.kind === 'question' ? step.question : null;
   const rule = step && step.kind !== 'finish' ? ruleFor(step.round.type) : null;
+  const hint = step?.kind === 'question' ? questionHint(step.question.secondary_text, step.round.type) : '';
   const revealed = question !== null && (game?.revealed.has(question.id) ?? false);
   const marked = question ? game?.answers[question.id] : undefined;
   const result = step?.kind === 'result' ? game?.results[step.round.id] : undefined;
@@ -323,8 +324,10 @@ export function QuizPlayer() {
             <Progress aria-label="Прогресс раунда" percent={step.position / step.round.questions.length * 100} showInfo={false} strokeColor="#b294ff" />
             <h1 ref={heading} tabIndex={-1}>{step.question.primary_text}</h1>
             {revealed ? <><Splash answer /><QuizAnswer question={step.question} roundType={step.round.type} /></> : <>
-              {step.question.secondary_text && <div className="mq-hint">{step.question.secondary_text}</div>}
-              {step.question.image_download_id && <QuizImage id={step.question.image_download_id} />}
+              {hint && <div className="mq-hint">{hint}</div>}
+              {step.round.type === 'artist_by_cover'
+                ? <QuizImage key={step.question.id} src={questionCoverURL(game.pack.id, step.question.number)} />
+                : step.question.image_download_id && <QuizImage key={step.question.id} src={fileURL(step.question.image_download_id)} />}
             </>}
             {clip && <>
               <div className="mq-audio">

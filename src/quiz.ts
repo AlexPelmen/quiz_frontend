@@ -22,7 +22,6 @@ export interface QuizQuestion {
   number: number;
   artist_id: string;
   track_id: string | null;
-  album_id: string | null;
   primary_text: string;
   secondary_text: string;
   answer: string;
@@ -43,6 +42,14 @@ export interface RoundResult {
 export const questionAudioURL = (packId: string, number: number) =>
   `/api/v1/quiz-packs/${encodeURIComponent(packId)}/questions/${number}/audio`;
 
+export const questionCoverURL = (packId: string, number: number) =>
+  `/api/v1/quiz-packs/${encodeURIComponent(packId)}/questions/${number}/cover`;
+
+export function questionHint(text: string, roundType: string) {
+  // В сохранённых пакетах согласные могли быть записаны как подчёркивания.
+  return roundType === 'track_vowels' ? text.replaceAll('_', '').replace(/\s+/g, ' ').trim().toLowerCase() : text;
+}
+
 const roundRules: Record<string, { name: string; instructions: string; label: string; symbol: string }> = {
   artist_by_track: {
     name: 'Кто звучит?',
@@ -58,7 +65,7 @@ const roundRules: Record<string, { name: string; instructions: string; label: st
   },
   track_vowels: {
     name: 'Только гласные',
-    instructions: 'Прослушайте отрывок и назовите трек. В подсказке оставлены гласные, а согласные заменены подчёркиваниями.',
+    instructions: 'Прослушайте отрывок и назовите трек. В подсказке пропущены согласные, а гласные показаны строчными буквами.',
     label: 'По гласным',
     symbol: 'А',
   },

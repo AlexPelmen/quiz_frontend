@@ -9,10 +9,12 @@ import { useAction } from './shared';
 import { Packs } from './Packs';
 import { Console } from './Console';
 import { Tags } from './Tags';
+import { AlbumGuessing } from './AlbumGuessing';
 
 const sections = [
   { key: 'artists', icon: <TeamOutlined />, label: 'Исполнители' },
   { key: 'albums', icon: <DatabaseOutlined />, label: 'Альбомы' },
+  { key: 'album-guessing', icon: <AppstoreOutlined />, label: 'Модерация обложек' },
   { key: 'tracks', icon: <CustomerServiceOutlined />, label: 'Треки' },
   { key: 'parsing', icon: <PlayCircleOutlined />, label: 'Парсинг' },
   { key: 'parsing-errors', icon: <WarningOutlined />, label: 'Ошибки парсинга' },
@@ -47,6 +49,7 @@ export function App() {
       <Layout.Content className="content">
         {health.error && <Alert className="connection-error" type="error" showIcon title="Нет соединения с сервером" description="Проверьте запуск backend и PostgreSQL. Повторная проверка выполняется автоматически." />}
         {isCatalog ? <Catalog key={section} resource={section} search={search} />
+          : section === 'album-guessing' ? <AlbumGuessing />
           : section === 'parsing' ? <Parsing /> : section === 'parsing-errors' ? <ParsingErrors /> : section === 'downloads' ? <Downloads /> : section === 'packs' ? <Packs /> : section === 'tags' ? <Tags /> : section === 'settings' ? <Settings /> : <Console />}
       </Layout.Content><Layout.Footer className="footer">Music Quiz · От каталога исполнителей до готового раунда</Layout.Footer>
     </Layout>

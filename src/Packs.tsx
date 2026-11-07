@@ -3,7 +3,7 @@ import { Button, Card, Collapse, Drawer, Form, Input, Modal, Popconfirm, Select,
 import { PlusOutlined } from '@ant-design/icons';
 import { useQuery } from '@tanstack/react-query';
 import { date, Entity, fileURL, request } from './api';
-import { questionAudioURL, QuizPack } from './quiz';
+import { questionAudioURL, questionCoverURL, questionHint, QuizPack } from './quiz';
 import { Failure, PageTitle, Refresh, useAction } from './shared';
 import { useTags } from './Tags';
 
@@ -39,12 +39,17 @@ export function Packs() {
     </Modal>
     <Drawer open={!!selected} title={detail.data?.name || 'Пакет'} onClose={() => setSelected(null)} size="large" loading={detail.isPending}>
       <Failure error={detail.error} /><p>{String(detail.data?.description || '')}</p>
-      <Collapse items={detail.data?.rounds?.map(round => ({ key: round.id, label: `Раунд ${round.number} · ${round.type}`, children: round.questions.map(q => <Card key={q.id} size="small" className="question" title={`${q.number}. ${q.primary_text}`}>
-        {!!q.secondary_text && <p>{q.secondary_text}</p>}
-        {q.image_download_id && <img className="cover" src={fileURL(q.image_download_id)} alt="Изображение вопроса" />}
-        {selected && q.sound_download_id && <><audio controls preload="none" src={questionAudioURL(selected, q.number)} /><div className="muted">Фрагмент: {q.trackStartSec?.toFixed(1)}–{q.trackFinishSec?.toFixed(1)} сек.</div></>}
-        <details><summary>Показать ответ</summary><p>{q.answer}</p>{!!q.answer_info?.artist && q.answer_info.artist !== q.answer && <p>Исполнитель: {String(q.answer_info.artist)}</p>}{!!q.answer_info?.track && q.answer_info.track !== q.answer && <p>Трек: {String(q.answer_info.track)}</p>}{!!q.answer_info?.album && <p>Альбом: {String(q.answer_info.album)}</p>}</details>
-      </Card>) }))} />
+      <Collapse items={detail.data?.rounds?.map(round => ({ key: round.id, label: `Раунд ${round.number} · ${round.type}`, children: round.questions.map(q => {
+        const hint = questionHint(q.secondary_text, round.type);
+        return <Card key={q.id} size="small" className="question" title={`${q.number}. ${q.primary_text}`}>
+          {hint && <p>{hint}</p>}
+          {round.type === 'artist_by_cover' && selected
+            ? <img className="cover" src={questionCoverURL(selected, q.number)} alt="Обложка с масками" />
+            : q.image_download_id && <img className="cover" src={fileURL(q.image_download_id)} alt="Изображение вопроса" />}
+          {selected && q.sound_download_id && <><audio controls preload="none" src={questionAudioURL(selected, q.number)} /><div className="muted">Фрагмент: {q.trackStartSec?.toFixed(1)}–{q.trackFinishSec?.toFixed(1)} сек.</div></>}
+          <details><summary>Показать ответ</summary><p>{q.answer}</p>{!!q.answer_info?.artist && q.answer_info.artist !== q.answer && <p>Исполнитель: {String(q.answer_info.artist)}</p>}{!!q.answer_info?.track && q.answer_info.track !== q.answer && <p>Трек: {String(q.answer_info.track)}</p>}{!!q.answer_info?.album && <p>Альбом: {String(q.answer_info.album)}</p>}</details>
+        </Card>;
+      }) }))} />
     </Drawer>
   </>;
 }
