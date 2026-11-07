@@ -8,13 +8,14 @@ import { Failure, PageTitle, Refresh, Status, useAction } from './shared';
 export function Parsing() {
   const query = useQuery({ queryKey: ['parsing-runs'], queryFn: () => request<Entity[]>('/parsing-runs?limit=100'), refetchInterval: 3000 });
   const action = useAction();
-  const active = query.data?.some(row => ['pending', 'running'].includes(row.status || ''));
+  const active = query.data?.some(row => ['pending', 'running', 'stopping'].includes(row.status || ''));
   return <><PageTitle title="Парсинг каталога" subtitle="Genius и MusicBrainz · состояние обновляется каждые 3 секунды">
     <Refresh onClick={() => void query.refetch()} /><Button href="#parsing-errors">Ошибки исполнителей</Button><Button type="primary" icon={<CaretRightOutlined />} loading={action.isPending} disabled={active || query.isPending || !!query.error} onClick={() => action.mutate({ path: '/parsing-runs' })}>Запустить парсер</Button>
   </PageTitle><Failure error={query.error} />
-    <Alert showIcon type="info" title="Сначала добавьте исполнителей" description="Парсер обработает новые записи и повторит исполнителей с ошибками предыдущих запусков. Исполнители в статусе «Вручную» пропускаются. Загрузки начнутся автоматически." />
+    <Alert showIcon type="info" title="Сначала добавьте исполнителей" description="Парсер обработает новые записи и повторит исполнителей с ошибками предыдущих запусков. Исполнители в статусе «Вручную» пропускаются. Загрузки начнутся автоматически. Остановка происходит после завершения текущего исполнителя." />
     <div className="panel spaced"><Table<Entity> rowKey="id" dataSource={query.data} loading={query.isFetching} scroll={{ x: 700 }} columns={[
       { title: 'Запуск', dataIndex: 'created_at', render: date }, { title: 'Статус', dataIndex: 'status', render: value => <Status value={value} /> },
+      { title: 'Действие', render: (_, row) => ['pending', 'running'].includes(row.status || '') ? <Button danger loading={action.isPending} onClick={() => action.mutate({ path: `/parsing-runs/${row.id}/stop` })}>Остановить</Button> : row.status === 'stopping' ? 'Ожидание завершения исполнителя' : '—' },
       { title: 'Обработано', dataIndex: 'processed' }, { title: 'С ошибками', dataIndex: 'failed' }, { title: 'Ошибка', dataIndex: 'error', ellipsis: true },
     ]} /></div></>;
 }
@@ -47,7 +48,7 @@ export function Downloads() {
   const [form] = Form.useForm();
   const action = useAction();
   const query = useQuery({ queryKey: ['downloads', status, page], queryFn: () => request<Entity[]>(`/downloads?limit=20&offset=${(page - 1) * 20}&status=${status}`), refetchInterval: 3000 });
-  return <><PageTitle title="Загрузки и медиатека" subtitle="Очередь, ошибки и сохранённые файлы · обновление каждые 3 секунды"><Refresh onClick={() => void query.refetch()} /></PageTitle>
+  return <><PageTitle title="Загрузки и медиатека" subtitle="Очередь, ошибки и сохранённые файлы · обновление каждые 3 секунды"><Refresh onClick={() => void query.refetch()} /><Button loading={action.isPending} onClick={() => action.mutate({ path: '/downloads/retry-youtube' })}>Повторить ошибки YouTube</Button></PageTitle>
     <Failure error={query.error} /><div className="panel"><div className="toolbar"><Select value={status} style={{ width: 240 }} onChange={value => { setStatus(value); setPage(1); }} options={[
       ['', 'Все состояния'], ['pending', 'В очереди'], ['processing', 'В обработке'], ['finished', 'Завершено'], ['errored', 'Ошибка'], ['manual', 'Нужен источник'],
     ].map(([value, label]) => ({ value, label }))} /><Tag color="green">Автообновление</Tag></div>

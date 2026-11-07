@@ -6,7 +6,7 @@ import { save } from './api';
 const labels: Record<string, string> = {
   created: 'Новый', processing: 'В обработке', parsed: 'Импортирован', errored: 'Ошибка',
   pending: 'В очереди', finished: 'Завершено', manual: 'Вручную', running: 'Выполняется',
-  missing: 'Нет записи',
+  missing: 'Нет записи', stopping: 'Останавливается', stopped: 'Остановлен',
 };
 export const statusLabel = (value: string) => labels[value] || value;
 export function Status({ value }: { value?: string }) {
