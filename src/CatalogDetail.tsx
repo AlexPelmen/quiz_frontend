@@ -7,7 +7,7 @@ import { date, Entity, fileURL, request, formatCount, guessRate } from './api';
 import { Failure, Status } from './shared';
 
 export const missingFieldLabels: Record<string, string> = {
-  full_name: 'Полное название', country: 'Страна', artists: 'Состав', logo: 'Логотип',
+  full_name: 'Полное название', country: 'Страна', artists: 'Состав', logo: 'Логотип', albums: 'Альбомы', tracks: 'Треки',
   cover: 'Обложка', release_date: 'Дата выхода', track_list: 'Треклист', album_id: 'Альбом',
   duration_seconds: 'Длительность', audio: 'Аудио', yt_plays: 'Прослушивания', yt_subs: 'Подписчики',
 };
@@ -36,7 +36,7 @@ function useEntity(resource: CatalogResource, id?: string) {
     queryKey: [resource, id],
     queryFn: ({ signal }) => request<Entity>(`/${resource}/${id}`, { signal }),
     enabled: !!id,
-    refetchInterval: query => query.state.data?.status === 'manual' || (resource === 'tracks' && query.state.data?.audio_status !== 'finished') ? 5000 : false,
+    refetchInterval: query => ['manual', 'partial', 'error'].includes(query.state.data?.status || '') || (resource === 'tracks' && query.state.data?.audio_status !== 'finished') ? 5000 : false,
   });
 }
 

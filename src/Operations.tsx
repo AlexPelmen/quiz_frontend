@@ -1,9 +1,19 @@
 import { useState } from 'react';
-import { Alert, Button, Card, Form, Input, InputNumber, Modal, Select, Space, Switch, Table, Tag, Typography } from 'antd';
+import { Alert, Button, Card, Col, Form, Input, InputNumber, Modal, Row, Select, Space, Switch, Table, Tag, Typography } from 'antd';
 import { CaretRightOutlined } from '@ant-design/icons';
 import { useQuery } from '@tanstack/react-query';
 import { date, Entity, fileURL, pretty, request } from './api';
 import { Failure, PageTitle, Refresh, Status, useAction } from './shared';
+
+const providers = [
+  { id: 'yt_music', name: 'YouTube Music', fields: 'Карточка, логотип, подписчики, месячная аудитория, популярные альбомы и треки, обложки, длительности и счётчики.' },
+  { id: 'genius', name: 'Genius', fields: 'Имя и логотип, альбомы и популярные треки, даты релизов и обложки.' },
+  { id: 'musicbrainz', name: 'MusicBrainz', fields: 'Страна и состав, альбомы и даты, записи и длительности, обложки через Cover Art Archive.' },
+];
+
+export function providerName(value: unknown) {
+  return providers.find(provider => provider.id === value)?.name ?? 'Общий импорт';
+}
 
 export function Parsing() {
   const query = useQuery({ queryKey: ['parsing-runs'], queryFn: () => request<Entity[]>('/parsing-runs?limit=100'), refetchInterval: 3000 });
@@ -12,20 +22,32 @@ export function Parsing() {
   return <><PageTitle title="Парсинг каталога" subtitle="YouTube Music, Genius и MusicBrainz · состояние обновляется каждые 3 секунды">
     <Refresh onClick={() => void query.refetch()} /><Button href="#parsing-errors">Ошибки исполнителей</Button><Button href="#parsing-logs">Журнал</Button>
     <Button href="#album-cleanup">Очистка альбомов</Button>
-    <Button loading={action.isPending} disabled={active || query.isPending || !!query.error}
-      onClick={() => action.mutate({ path: '/parsing-runs', body: { refresh: true } })}>Обновить каталог</Button><Button type="primary" icon={<CaretRightOutlined />} loading={action.isPending} disabled={active || query.isPending || !!query.error} onClick={() => action.mutate({ path: '/parsing-runs' })}>Запустить парсер</Button>
-  </PageTitle><Failure error={query.error} />
-    <Alert showIcon type="info" title="Сначала добавьте исполнителей" description="Парсер обработает новые записи и повторит исполнителей с ошибками предыдущих запусков. Исполнители в статусе «Вручную» пропускаются. Загрузки будут ждать выбора на странице «Загрузки». Остановка происходит после завершения текущего исполнителя." />
-    <div className="panel spaced"><Table<Entity> rowKey="id" dataSource={query.data} loading={query.isFetching} scroll={{ x: 700 }} columns={[
+  </PageTitle><Failure error={query.error || action.error} />
+    <Row gutter={[12, 12]}>
+      {providers.map(provider => <Col key={provider.id} xs={24} md={12} xl={8}>
+        <Card size="small" style={{ height: '100%' }}>
+          <Space direction="vertical">
+            <Button type="primary" icon={<CaretRightOutlined />} loading={action.isPending}
+              disabled={active || query.isPending || !!query.error}
+              onClick={() => action.mutate({ path: '/parsing-runs', body: { provider: provider.id } })}>{provider.name}</Button>
+            <Typography.Text type="secondary">{provider.fields}</Typography.Text>
+          </Space>
+        </Card>
+      </Col>)}
+    </Row>
+    <div className="panel spaced"><Table<Entity> rowKey="id" dataSource={query.data} loading={query.isFetching} scroll={{ x: 1040 }} columns={[
       { title: 'Запуск', dataIndex: 'created_at', render: date }, { title: 'Статус', dataIndex: 'status', render: value => <Status value={value} /> },
+      { title: 'Провайдер', dataIndex: 'provider', render: providerName },
       { title: 'Действие', render: (_, row) => ['pending', 'running'].includes(row.status || '') ? <Button danger loading={action.isPending} onClick={() => action.mutate({ path: `/parsing-runs/${row.id}/stop` })}>Остановить</Button> : row.status === 'stopping' ? 'Ожидание завершения исполнителя' : '—' },
       { title: 'Журнал', render: (_, row) => <Button href={`#parsing-logs?run=${row.id}`}>Открыть</Button> },
-      { title: 'Обработано', dataIndex: 'processed' }, { title: 'С ошибками', dataIndex: 'failed' }, { title: 'Ошибка', dataIndex: 'error', ellipsis: true },
+      { title: 'Исполнителей', dataIndex: 'processed' }, { title: 'Полей', dataIndex: 'fields' },
+      { title: 'Альбомов', dataIndex: 'albums' }, { title: 'Треков', dataIndex: 'tracks' },
+      { title: 'Сбоев', dataIndex: 'errors' }, { title: 'Причина остановки', dataIndex: 'error', ellipsis: true },
     ]} /></div></>;
 }
 
 export function ParsingErrors() {
-  const [status, setStatus] = useState('errored');
+  const [status, setStatus] = useState('error');
   const [page, setPage] = useState(1);
   const action = useAction();
   const query = useQuery({ queryKey: ['parsing-errors', status, page],
@@ -35,7 +57,8 @@ export function ParsingErrors() {
     <Failure error={query.error} /><Alert type="info" showIcon title="Ошибки повторяются при следующем запуске"
       description="Чтобы временно исключить исполнителя из автоматического парсинга, переведите его в «Вручную». Вернуть в очередь можно в любой момент." />
     <div className="panel spaced"><div className="toolbar"><Select value={status} style={{ width: 250 }} onChange={value => { setStatus(value); setPage(1); }} options={[
-      { value: 'errored', label: 'Завершились ошибкой' }, { value: 'manual', label: 'Ручная обработка' },
+      { value: 'error', label: 'Завершились ошибкой' }, { value: 'partial', label: 'Частично заполнены' },
+      { value: 'errored', label: 'Ошибки прежних запусков' }, { value: 'manual', label: 'Ручная обработка' },
     ]} /></div><Table<Entity> rowKey="id" dataSource={query.data} loading={query.isPending} pagination={false} scroll={{ x: 800 }} columns={[
       { title: 'Исполнитель', dataIndex: 'name', width: 200 },
       { title: 'Статус', dataIndex: 'status', width: 130, render: value => <Status value={value} /> },
@@ -140,19 +163,28 @@ export function Settings() {
   const query = useQuery({ queryKey: ['settings'], queryFn: () => request<Record<string, unknown>>('/settings'), refetchOnWindowFocus: false });
   const action = useAction();
   const [form] = Form.useForm();
-  const { quiz_guess_rate_enabled, quiz_guess_rate_asked_threshold, ...other } = query.data || {};
+  const { quiz_guess_rate_enabled, quiz_guess_rate_asked_threshold, source_429_retries, parser_stop_failures, ...other } = query.data || {};
   return <><PageTitle title="Настройки" subtitle="Параметры парсинга, загрузок и последовательность раундов"><Refresh onClick={() => void query.refetch()} /></PageTitle>
     <Failure error={query.error || action.error} /><Card title="Конфигурация сервиса">
       <Alert type="info" showIcon title="Настройки хранятся в PostgreSQL"
         description="Отключите учёт ответов, чтобы подбирать вопросы только по прослушиваниям YouTube Music." />
       {query.data && <Form key={query.dataUpdatedAt} form={form} layout="vertical"
-        initialValues={{ json: pretty(other), quiz_guess_rate_enabled, quiz_guess_rate_asked_threshold }}
+        initialValues={{ json: pretty(other), quiz_guess_rate_enabled, quiz_guess_rate_asked_threshold, source_429_retries, parser_stop_failures }}
         onFinish={({ json, ...values }) => action.mutate({ path: '/settings', method: 'PATCH', body: { ...JSON.parse(json), ...values } })}>
         <Form.Item className="spaced" name="quiz_guess_rate_enabled" label="Учитывать правильные ответы" valuePropName="checked"><Switch /></Form.Item>
         <Form.Item name="quiz_guess_rate_asked_threshold" label="Порог числа показов"
           extra="Доля правильных ответов используется, когда число показов превышает порог."
           rules={[{ required: true, type: 'integer', min: 0 }]}>
           <InputNumber min={0} precision={0} />
+        </Form.Item>
+        <Form.Item name="source_429_retries" label="Повторов запроса после ошибки"
+          rules={[{ required: true, type: 'integer', min: 0, max: 10 }]}>
+          <InputNumber min={0} max={10} precision={0} />
+        </Form.Item>
+        <Form.Item name="parser_stop_failures" label="Остановить после одинаковых сбоев подряд"
+          extra="Серия должна затронуть как минимум две разные сущности."
+          rules={[{ required: true, type: 'integer', min: 2, max: 1000 }]}>
+          <InputNumber min={2} max={1000} precision={0} />
         </Form.Item>
         <Form.Item className="spaced" name="json" label="JSON настроек" rules={[{ validator: (_, value) => validateJSON(value) }]}><Input.TextArea autoSize={{ minRows: 18, maxRows: 32 }} className="code-input" /></Form.Item>
         <Button htmlType="submit" type="primary" loading={action.isPending}>Сохранить настройки</Button>

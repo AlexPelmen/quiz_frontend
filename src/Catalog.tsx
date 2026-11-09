@@ -138,7 +138,7 @@ export function Catalog({ resource, search }: { resource: CatalogResource; searc
     { title: 'Добавлен', dataIndex: 'created_at', ...sortColumn('created_at'), render: date },
     { title: 'Действия', width: resource === 'artists' ? 240 : 125, render: (_, row) => <Space wrap>
       <Button aria-label="Изменить" icon={<EditOutlined />} onClick={() => startEdit(row)} />
-      {resource === 'artists' && ['parsed', 'errored'].includes(row.status || '') && <Button onClick={() => action.mutate({ path: `/artists/${row.id}/retry` })}>Повторить</Button>}
+      {resource === 'artists' && ['parsed', 'error', 'errored', 'partial'].includes(row.status || '') && <Button onClick={() => action.mutate({ path: `/artists/${row.id}/retry` })}>Повторить</Button>}
       {resource === 'artists' && row.status !== 'processing' && <Button onClick={() => action.mutate({ path: `/artists/${row.id}`, method: 'PATCH', body: { status: row.status === 'manual' ? 'created' : 'manual' } })}>{row.status === 'manual' ? 'В очередь' : 'Вручную'}</Button>}
       <Popconfirm title="Удалить запись?" description="Связанные данные могут быть удалены. Вопросы существующих пакетов защищены." onConfirm={() => action.mutateAsync({ path: `/${resource}/${row.id}`, method: 'DELETE' })}>
         <Button danger aria-label="Удалить" icon={<DeleteOutlined />} />
@@ -158,7 +158,7 @@ export function Catalog({ resource, search }: { resource: CatalogResource; searc
           <Select aria-label="Фильтр по тегу" placeholder="Фильтр по тегу" value={params.get('tag') || undefined} allowClear showSearch={{ optionFilterProp: 'label' }} options={tagOptions} onChange={value => updateRoute({ tag: value })} />
         </> : <Select aria-label="Поиск по исполнителю" placeholder="Поиск по исполнителю" value={artistID} loading={artists.isPending} showSearch={{ optionFilterProp: 'label' }} allowClear options={artistOptions} onChange={value => updateRoute({ artist_id: value })} />}
         <Select aria-label="Статус каталога" placeholder="Все статусы каталога" value={params.get('status') || undefined}
-          allowClear options={(resource === 'artists' ? ['created', 'processing', 'parsed', 'errored', 'manual'] : ['parsed', 'manual'])
+          allowClear options={(resource === 'artists' ? ['created', 'processing', 'parsed', 'partial', 'error', 'errored', 'manual'] : ['parsed', 'partial', 'error', 'manual'])
             .map(value => ({ value, label: statusLabel(value) }))}
           onChange={value => updateRoute({ status: value })} />
         {resource === 'tracks' && <>

@@ -4,13 +4,13 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { save } from './api';
 
 const labels: Record<string, string> = {
-  created: 'Новый', processing: 'В обработке', parsed: 'Импортирован', errored: 'Ошибка',
+  created: 'Новый', processing: 'В обработке', parsed: 'Импортирован', errored: 'Ошибка', error: 'Ошибка', partial: 'Частично',
   pending: 'В очереди', finished: 'Завершено', manual: 'Вручную', running: 'Выполняется',
   missing: 'Нет записи', stopping: 'Останавливается', stopped: 'Остановлен',
 };
 export const statusLabel = (value: string) => labels[value] || value;
 export function Status({ value }: { value?: string }) {
-  const color = value === 'errored' ? 'error' : value === 'finished' || value === 'parsed' ? 'success'
+  const color = value === 'errored' || value === 'error' ? 'error' : value === 'finished' || value === 'parsed' ? 'success'
     : value === 'manual' ? 'warning' : 'processing';
   return value ? <Tag color={value === 'missing' ? 'default' : color}>{statusLabel(value)}</Tag> : null;
 }

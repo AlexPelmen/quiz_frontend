@@ -3,6 +3,7 @@ import { Alert, Button, Card, Popconfirm, Select, Space, Table, Tag, Typography 
 import { useQuery } from '@tanstack/react-query';
 import { date, Entity, request } from './api';
 import { Failure, PageTitle, Refresh, Status, statusLabel, useAction } from './shared';
+import { providerName } from './Operations';
 
 interface ParseEvent {
   id: number;
@@ -49,7 +50,8 @@ export function ParsingLogs({ search }: { search?: string }) {
         options={runs.data?.map(row => ({ value: row.id, label: `${date(row.created_at)} · ${statusLabel(row.status || '')}` }))}
         onChange={value => { location.hash = `parsing-logs?run=${encodeURIComponent(value)}`; }} />
       <Status value={run?.status} />
-      {run && <Typography.Text>Обработано {String(run.processed ?? 0)}, ошибок {String(run.failed ?? 0)}</Typography.Text>}
+      {run && <Typography.Text>{providerName(run.provider)} · Полей {String(run.fields ?? 0)} ·
+        Альбомов {String(run.albums ?? 0)} · Треков {String(run.tracks ?? 0)} · Сбоев {String(run.errors ?? 0)}</Typography.Text>}
     </Space>
     {latest && <Alert showIcon type="info" title={latest.artist ? `${latest.artist} · ${latest.stage}` : latest.stage}
       description={`${latest.message} · ${lastEventAge} сек. назад`} />}
@@ -79,14 +81,14 @@ export function AlbumCleanup() {
   });
   const rows = candidates.data?.slice(0, pageSize);
   return <>
-    <PageTitle title="Очистка альбомов" subtitle="Просмотр и удаление альбомов вне пятёрки YouTube Music">
+    <PageTitle title="Очистка альбомов" subtitle="Просмотр и удаление альбомов вне подборки YouTube Music">
       <Button href="#parsing">К парсингу</Button>
       <Refresh onClick={() => { setSelected([]); void candidates.refetch(); }} />
     </PageTitle>
     <Failure error={candidates.error} />
     <Failure error={action.error} />
-    <Alert showIcon type="info" title="Сначала обновите каталог через страницу «Парсинг»"
-      description="Здесь появятся лишние альбомы исполнителей, у которых парсер набрал пять релизов из рейтинга YouTube Music. Альбомы из готовых квизов защищены. При удалении альбома связанные треки остаются в каталоге." />
+    <Alert showIcon type="info" title="Подборки формируются при парсинге через YouTube Music"
+      description="Здесь появятся лишние альбомы исполнителей с полной подборкой из рейтинга YouTube Music. Размер подборки зависит от числа подписчиков. Альбомы из готовых квизов защищены. При удалении альбома связанные треки остаются в каталоге." />
     <Card className="spaced" size="small">
       <Popconfirm title={`Удалить выбранные альбомы (${selected.length})?`}
         description="Будут удалены записи альбомов и их разметка."
