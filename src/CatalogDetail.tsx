@@ -3,8 +3,14 @@ import type { DescriptionsProps } from 'antd';
 import { EditOutlined, RightOutlined } from '@ant-design/icons';
 import { useQuery } from '@tanstack/react-query';
 import Papa from 'papaparse';
-import { date, Entity, fileURL, request } from './api';
+import { date, Entity, fileURL, request, formatCount, guessRate } from './api';
 import { Failure, Status } from './shared';
+
+export const missingFieldLabels: Record<string, string> = {
+  full_name: 'Полное название', country: 'Страна', artists: 'Состав', logo: 'Логотип',
+  cover: 'Обложка', release_date: 'Дата выхода', track_list: 'Треклист', album_id: 'Альбом',
+  duration_seconds: 'Длительность', audio: 'Аудио', yt_plays: 'Прослушивания', yt_subs: 'Подписчики',
+};
 
 export type CatalogResource = 'artists' | 'albums' | 'tracks';
 
@@ -30,7 +36,7 @@ function useEntity(resource: CatalogResource, id?: string) {
     queryKey: [resource, id],
     queryFn: ({ signal }) => request<Entity>(`/${resource}/${id}`, { signal }),
     enabled: !!id,
-    refetchInterval: query => resource === 'tracks' && query.state.data?.status !== 'finished' ? 5000 : false,
+    refetchInterval: query => query.state.data?.status === 'manual' || (resource === 'tracks' && query.state.data?.audio_status !== 'finished') ? 5000 : false,
   });
 }
 
@@ -39,15 +45,17 @@ function CatalogRecord({ resource, row }: { resource: CatalogResource; row: Enti
   const album = useEntity('albums', typeof row.album_id === 'string' ? row.album_id : undefined);
   const imageID = resource === 'artists' ? row.logo_download_id : row.cover_download_id;
   const fields: NonNullable<DescriptionsProps['items']> = [
-    { key: 'points', label: resource === 'albums' ? 'Узнаваемость обложки' : 'Известность', children: `${row.points} / 100` },
-    { key: 'guess_num', label: 'Показов в завершённых раундах', children: String(row.guess_num ?? '—') },
+    { key: 'yt_plays', label: 'Прослушивания', children: formatCount(row.yt_plays) },
+    { key: 'guessed', label: 'Угадали / загадали', children: guessRate(row) },
+    { key: 'excluded_from_quiz', label: 'Исключено из квиза', children: row.excluded_from_quiz ? 'Да' : 'Нет' },
     { key: 'tags', label: 'Теги', children: row.tags?.length ? row.tags.map(tag => <Tag key={tag}>{tag}</Tag>) : '—' },
   ];
   if (row.status) fields.push({
-    key: 'status', label: resource === 'tracks' ? 'Статус аудио' : 'Статус', children: <Status value={row.status} />,
+    key: 'status', label: 'Статус каталога', children: <Status value={row.status} />,
   });
   if (resource === 'artists') {
     fields.push(
+      { key: 'yt_subs', label: 'Подписчики', children: formatCount(row.yt_subs) },
       { key: 'full_name', label: 'Полное название', children: String(row.full_name || '—') },
       { key: 'country', label: 'Страна', children: String(row.country || '—') },
       { key: 'artists', label: 'Участники группы', children: Array.isArray(row.artists) && row.artists.length ? row.artists.join(', ') : '—' },
@@ -55,7 +63,11 @@ function CatalogRecord({ resource, row }: { resource: CatalogResource; row: Enti
   } else {
     fields.push({ key: 'artist', label: 'Исполнитель', children: artist.data?.name || (artist.isFetching ? 'Загрузка…' : '—') });
     if (resource === 'albums') fields.push({ key: 'release_date', label: 'Дата выхода', children: String(row.release_date || '—') });
-    else fields.push({ key: 'album', label: 'Альбом', children: album.data?.name || (album.isFetching ? 'Загрузка…' : '—') });
+    else fields.push(
+      { key: 'album', label: 'Альбом', children: album.data?.name || (album.isFetching ? 'Загрузка…' : '—') },
+      { key: 'audio_status', label: 'Статус аудио', children: <Status value={row.audio_status} /> },
+      { key: 'duration_seconds', label: 'Длительность, секунды', children: String(row.duration_seconds ?? '—') },
+    );
   }
   fields.push(
     { key: 'created_at', label: 'Добавлен', children: date(row.created_at) },
@@ -63,6 +75,8 @@ function CatalogRecord({ resource, row }: { resource: CatalogResource; row: Enti
   );
 
   return <div className="catalog-detail">
+    {!!row.missing_fields?.length && <Alert type="warning" showIcon title="Данные для заполнения"
+      description={row.missing_fields.map(field => missingFieldLabels[field] || field).join(', ')} />}
     {row.error && <Alert type="error" showIcon title={row.error} />}
     <Failure error={artist.error || album.error} />
     {resource !== 'tracks' && <CatalogImage id={typeof imageID === 'string' ? imageID : undefined} />}
@@ -76,6 +90,7 @@ function CatalogRecord({ resource, row }: { resource: CatalogResource; row: Enti
       <summary>Идентификаторы</summary>
       <Descriptions size="small" column={1} items={[
         { key: 'id', label: 'ID', children: <Typography.Text copyable>{row.id}</Typography.Text> },
+        ...(row.yt_music_id ? [{ key: 'yt_music_id', label: 'YouTube Music', children: String(row.yt_music_id) }] : []),
         ...(row.genius_id ? [{ key: 'genius_id', label: 'Genius', children: String(row.genius_id) }] : []),
         ...(row.musicbrainz_id ? [{ key: 'musicbrainz_id', label: 'MusicBrainz', children: String(row.musicbrainz_id) }] : []),
       ]} />
@@ -173,6 +188,7 @@ function TrackAudio({ trackID }: { trackID: string }) {
       <Space wrap>
         <Status value={row.status} />
         <Tag>{row.source_type === 'upload' ? 'Загружено вручную' : row.source_type}</Tag>
+        {row.preview && <Tag>Короткая запись</Tag>}
         {index === 0 && row.source_type === 'upload' && <Tag color="purple">Основная запись</Tag>}
       </Space>
       {row.status === 'finished' && row.file_type === 'mp3' && <audio controls preload="none" src={fileURL(row.id)} />}
