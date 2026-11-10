@@ -55,6 +55,7 @@ function CatalogRecord({ resource, row }: { resource: CatalogResource; row: Enti
   });
   if (resource === 'artists') {
     fields.push(
+      { key: 'yt_music_url', label: 'Ссылка на YT Music', children: typeof row.yt_music_url === 'string' && row.yt_music_url ? <Typography.Link href={row.yt_music_url} target="_blank" rel="noopener noreferrer">{row.yt_music_url}</Typography.Link> : '—' },
       { key: 'yt_subs', label: 'Подписчики', children: formatCount(row.yt_subs) },
       { key: 'full_name', label: 'Полное название', children: String(row.full_name || '—') },
       { key: 'country', label: 'Страна', children: String(row.country || '—') },

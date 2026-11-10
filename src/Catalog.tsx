@@ -77,7 +77,7 @@ export function Catalog({ resource, search }: { resource: CatalogResource; searc
   const submit = (values: Record<string, unknown>) => {
     if (!editing) return;
     const common = ['name', 'yt_plays', 'excluded_from_quiz', 'tags'];
-    const allowed = [...common, ...(resource === 'artists' ? ['country', 'full_name', 'artists', 'yt_subs']
+    const allowed = [...common, ...(resource === 'artists' ? ['country', 'full_name', 'artists', 'yt_subs', 'yt_music_url']
       : resource === 'albums' ? ['release_date', 'track_list'] : ['album_id', 'duration_seconds']),
       ...(resource !== 'artists' && editing === 'new' ? ['artist_id'] : [])];
     const body = Object.fromEntries(Object.entries(values).filter(([key, value]) =>
@@ -189,6 +189,9 @@ export function Catalog({ resource, search }: { resource: CatalogResource; searc
         <Form.Item name="tags" label="Теги" extra="Управление списком — в разделе «Теги»"><Select mode="multiple" showSearch={{ optionFilterProp: 'label' }} options={tagOptions} loading={tags.isPending} disabled={tags.isError} /></Form.Item>
         {resource === 'artists' ? <>
           <Form.Item name="full_name" label="Полное название"><Input /></Form.Item>
+          <Form.Item name="yt_music_url" label="Ссылка на YT Music" extra={editing !== 'new' && editing?.yt_music_id ? 'ID исполнителя уже сохранён.' : 'Ссылка на страницу исполнителя; ID определится при парсинге.'}>
+            <Input placeholder="https://music.youtube.com/@artist" disabled={editing !== 'new' && !!editing?.yt_music_id} />
+          </Form.Item>
           <Form.Item name="country" label="Страна"><Input /></Form.Item>
           <Form.Item name="yt_subs" label="Подписчики YouTube Music"><InputNumber min={0} max={Number.MAX_SAFE_INTEGER} precision={0} /></Form.Item>
           <Form.Item name="artists" label="Участники группы"><Select mode="tags" tokenSeparators={[',']} /></Form.Item>
