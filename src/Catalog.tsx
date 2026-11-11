@@ -139,7 +139,6 @@ export function Catalog({ resource, search }: { resource: CatalogResource; searc
     { title: 'Действия', width: resource === 'artists' ? 240 : 125, render: (_, row) => <Space wrap>
       <Button aria-label="Изменить" icon={<EditOutlined />} onClick={() => startEdit(row)} />
       {resource === 'artists' && ['parsed', 'error', 'errored', 'partial'].includes(row.status || '') && <Button onClick={() => action.mutate({ path: `/artists/${row.id}/retry` })}>Повторить</Button>}
-      {resource === 'artists' && row.status !== 'processing' && <Button onClick={() => action.mutate({ path: `/artists/${row.id}`, method: 'PATCH', body: { status: row.status === 'manual' ? 'created' : 'manual' } })}>{row.status === 'manual' ? 'В очередь' : 'Вручную'}</Button>}
       <Popconfirm title="Удалить запись?" description="Связанные данные могут быть удалены. Вопросы существующих пакетов защищены." onConfirm={() => action.mutateAsync({ path: `/${resource}/${row.id}`, method: 'DELETE' })}>
         <Button danger aria-label="Удалить" icon={<DeleteOutlined />} />
       </Popconfirm>

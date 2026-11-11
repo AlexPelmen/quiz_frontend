@@ -55,7 +55,7 @@ export function ParsingErrors() {
   return <><PageTitle title="Ошибки парсинга" subtitle="Причины ошибок исполнителей и ручная обработка">
     <Refresh onClick={() => void query.refetch()} /><Button href="#parsing">К запускам</Button></PageTitle>
     <Failure error={query.error} /><Alert type="info" showIcon title="Ошибки повторяются при следующем запуске"
-      description="Чтобы временно исключить исполнителя из автоматического парсинга, переведите его в «Вручную». Вернуть в очередь можно в любой момент." />
+      description="Исполнителей с ручным статусом можно вернуть в очередь." />
     <div className="panel spaced"><div className="toolbar"><Select value={status} style={{ width: 250 }} onChange={value => { setStatus(value); setPage(1); }} options={[
       { value: 'error', label: 'Завершились ошибкой' }, { value: 'partial', label: 'Частично заполнены' },
       { value: 'errored', label: 'Ошибки прежних запусков' }, { value: 'manual', label: 'Ручная обработка' },
@@ -64,7 +64,7 @@ export function ParsingErrors() {
       { title: 'Статус', dataIndex: 'status', width: 130, render: value => <Status value={value} /> },
       { title: 'Последняя ошибка', dataIndex: 'error', render: (value: string) => value ? <Typography.Text copyable>{value}</Typography.Text> : <span className="muted">Нет сохранённой ошибки</span> },
       { title: 'Обновлено', dataIndex: 'updated_at', width: 170, render: date },
-      { title: 'Действия', width: 180, render: (_, row) => <Button loading={action.isPending} onClick={() => action.mutate({ path: `/artists/${row.id}`, method: 'PATCH', body: { status: status === 'manual' ? 'created' : 'manual' } })}>{status === 'manual' ? 'Вернуть в очередь' : 'Вручную'}</Button> },
+      { title: 'Действия', width: 180, render: (_, row) => status === 'manual' && <Button loading={action.isPending} onClick={() => action.mutate({ path: `/artists/${row.id}`, method: 'PATCH', body: { status: 'created' } })}>Вернуть в очередь</Button> },
     ]} /><div className="pager"><Button disabled={page === 1} onClick={() => setPage(page - 1)}>Назад</Button>Страница {page}<Button disabled={(query.data?.length || 0) < 20} onClick={() => setPage(page + 1)}>Далее</Button></div></div></>;
 }
 
@@ -86,6 +86,7 @@ export function Downloads() {
   const [page, setPage] = useState(1);
   const [editing, setEditing] = useState<Entity | null>(null);
   const [selected, setSelected] = useState<Entity[]>([]);
+	const [queued, setQueued] = useState<number | null>(null);
   const [form] = Form.useForm();
   const action = useAction();
   const query = useQuery({ queryKey: ['downloads', status, page], queryFn: ({ signal }) => request<Entity[]>(`/downloads?limit=20&offset=${(page - 1) * 20}&status=${status}`, { signal }), refetchInterval: 3000 });
@@ -95,6 +96,9 @@ export function Downloads() {
   const start = (downloader: string) => action.mutate({
     path: '/downloads/start', body: { downloader, download_ids: selected.map(row => row.id) },
   }, { onSuccess: () => setSelected([]) });
+  const startAll = (downloader: string) => action.mutate({
+    path: '/downloads/start', body: { downloader, all_waiting: true },
+  }, { onSuccess: result => { setSelected([]); setQueued((result as { queued: number }).queued); } });
 
   return <>
     <PageTitle title="Загрузки и медиатека" subtitle="Отметьте задания и запустите нужный загрузчик">
@@ -102,6 +106,14 @@ export function Downloads() {
     </PageTitle>
     <Failure error={query.error || action.error} />
     <div className="panel">
+      <Typography.Title level={5}>Все задания, ожидающие запуска</Typography.Title>
+      <Typography.Paragraph type="secondary">Выберите загрузчик для всех ожидающих аудиозаписей или изображений. Задания с ошибками и уже запущенные задания не затрагиваются.</Typography.Paragraph>
+      <Space wrap className="toolbar">
+        {downloaders.map(({ key, label }) => <Button key={key} loading={action.isPending}
+          onClick={() => startAll(key)}>Все: {label}</Button>)}
+      </Space>
+      {queued !== null && <Alert type="success" showIcon title={`Добавлено в очередь: ${queued}`} />}
+      <Typography.Title level={5}>Выбранные задания</Typography.Title>
       <Space wrap className="toolbar">
         {downloaders.map(({ key, label }) => <Button key={key} loading={action.isPending}
           disabled={!canStartSelection || !compatible(key)} onClick={() => start(key)}>Запустить {label}</Button>)}
