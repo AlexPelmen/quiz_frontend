@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { Alert, Button, Card, Col, Form, Input, InputNumber, Modal, Row, Select, Space, Switch, Table, Tag, Typography } from 'antd';
+import { Alert, Button, Card, Checkbox, Col, Form, Input, InputNumber, Modal, Row, Select, Space, Switch, Table, Tabs, Tag, Typography } from 'antd';
 import { CaretRightOutlined } from '@ant-design/icons';
-import { useQuery } from '@tanstack/react-query';
-import { date, Entity, fileURL, pretty, request } from './api';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { date, Entity, fileURL, pretty, request, save } from './api';
 import { Failure, PageTitle, Refresh, Status, useAction } from './shared';
 
 const providers = [
@@ -78,27 +78,29 @@ const downloaders = [
 
 function canStart(row: Entity) {
   return ['created', 'errored', 'manual'].includes(row.status || '')
-    && (row.file_type === 'mp3' || row.source_type === 'image');
+    && (row.file_type === 'mp3' || (row.source_type === 'image' && !!row.source_uri));
 }
 
 export function Downloads() {
   const [status, setStatus] = useState('');
+  const [kind, setKind] = useState('mp3');
+  const [allSelected, setAllSelected] = useState(false);
+  const [excluded, setExcluded] = useState<string[]>([]);
   const [page, setPage] = useState(1);
   const [editing, setEditing] = useState<Entity | null>(null);
   const [selected, setSelected] = useState<Entity[]>([]);
 	const [queued, setQueued] = useState<number | null>(null);
   const [form] = Form.useForm();
   const action = useAction();
-  const query = useQuery({ queryKey: ['downloads', status, page], queryFn: ({ signal }) => request<Entity[]>(`/downloads?limit=20&offset=${(page - 1) * 20}&status=${status}`, { signal }), refetchInterval: 3000 });
-  const canStartSelection = selected.length > 0 && selected.length <= 200
-    && selected.every(row => canStart(query.data?.find(current => current.id === row.id) || row));
-  const compatible = (key: string) => selected.every(row => key === 'image' ? row.source_type === 'image' : row.file_type === 'mp3');
+  const query = useQuery({ queryKey: ['downloads', status, kind, page], queryFn: ({ signal }) => request<Entity[]>(`/downloads?limit=20&offset=${(page - 1) * 20}&status=${status}&file_type=${kind}`, { signal }), refetchInterval: 3000 });
+  const clearSelection = () => { setSelected([]); setAllSelected(false); setExcluded([]); };
+  const canStartSelection = allSelected || (selected.length > 0 && selected.length <= 200
+    && selected.every(row => canStart(query.data?.find(current => current.id === row.id) || row)));
   const start = (downloader: string) => action.mutate({
-    path: '/downloads/start', body: { downloader, download_ids: selected.map(row => row.id) },
-  }, { onSuccess: () => setSelected([]) });
-  const startAll = (downloader: string) => action.mutate({
-    path: '/downloads/start', body: { downloader, all_waiting: true },
-  }, { onSuccess: result => { setSelected([]); setQueued((result as { queued: number }).queued); } });
+    path: '/downloads/start', body: allSelected
+      ? { downloader, all_matching: true, status, excluded_ids: excluded }
+      : { downloader, download_ids: selected.map(row => row.id) },
+  }, { onSuccess: result => { clearSelection(); setQueued((result as { queued: number }).queued); } });
 
   return <>
     <PageTitle title="Загрузки и медиатека" subtitle="Отметьте задания и запустите нужный загрузчик">
@@ -106,32 +108,37 @@ export function Downloads() {
     </PageTitle>
     <Failure error={query.error || action.error} />
     <div className="panel">
-      <Typography.Title level={5}>Все задания, ожидающие запуска</Typography.Title>
-      <Typography.Paragraph type="secondary">Выберите загрузчик для всех ожидающих аудиозаписей или изображений. Задания с ошибками и уже запущенные задания не затрагиваются.</Typography.Paragraph>
-      <Space wrap className="toolbar">
-        {downloaders.map(({ key, label }) => <Button key={key} loading={action.isPending}
-          onClick={() => startAll(key)}>Все: {label}</Button>)}
-      </Space>
+      <Tabs activeKey={kind} onChange={value => { setKind(value); setPage(1); clearSelection(); }} items={[
+        { key: 'mp3', label: 'Музыка' }, { key: 'image', label: 'Изображения' },
+      ]} />
       {queued !== null && <Alert type="success" showIcon title={`Добавлено в очередь: ${queued}`} />}
-      <Typography.Title level={5}>Выбранные задания</Typography.Title>
       <Space wrap className="toolbar">
-        {downloaders.map(({ key, label }) => <Button key={key} loading={action.isPending}
-          disabled={!canStartSelection || !compatible(key)} onClick={() => start(key)}>Запустить {label}</Button>)}
+        {downloaders.filter(item => kind === 'image' ? item.key === 'image' : item.key !== 'image').map(({ key, label }) =>
+          <Button key={key} loading={action.isPending} disabled={!canStartSelection} onClick={() => start(key)}>Запустить {label}</Button>)}
       </Space>
       <div className="toolbar">
-        <Select aria-label="Состояние загрузки" value={status} style={{ width: 220 }} onChange={value => { setStatus(value); setPage(1); }} options={[
+        <Select aria-label="Состояние загрузки" value={status} style={{ width: 220 }} onChange={value => { setStatus(value); setPage(1); clearSelection(); }} options={[
           ['', 'Все состояния'], ['created', 'Ждёт запуска'], ['pending', 'В очереди'], ['processing', 'В обработке'],
           ['finished', 'Завершено'], ['errored', 'Ошибка'], ['manual', 'Нужен источник'],
         ].map(([value, label]) => ({ value, label }))} />
-        <Typography.Text>Выбрано {selected.length}</Typography.Text>
-        {!!selected.length && <Button onClick={() => setSelected([])}>Снять выбор</Button>}
+        <Typography.Text>{allSelected ? `Выбраны все подходящие задания${excluded.length ? `, исключено ${excluded.length}` : ''}` : `Выбрано ${selected.length}`}</Typography.Text>
+        {(!!selected.length || allSelected) && <Button onClick={clearSelection}>Снять выбор</Button>}
         {selected.length > 200 && <Typography.Text type="warning">За один запуск можно выбрать до 200 заданий.</Typography.Text>}
-        {!!selected.length && !compatible('image') && !compatible('hitmo') &&
-          <Typography.Text type="secondary">Выберите отдельно аудио или изображения.</Typography.Text>}
+
       </div>
       <Table<Entity> rowKey="id" loading={query.isPending} dataSource={query.data} pagination={false} scroll={{ x: 980 }}
-        rowSelection={{ selectedRowKeys: selected.map(row => row.id), preserveSelectedRowKeys: true,
-          onChange: (_, rows) => setSelected(rows), getCheckboxProps: row => ({ disabled: !canStart(row) }) }}
+        rowSelection={{
+          columnTitle: <Checkbox aria-label="Выбрать все задания" checked={allSelected}
+            disabled={!!status && !['created', 'errored', 'manual'].includes(status)}
+            onChange={event => { setAllSelected(event.target.checked); setSelected([]); setExcluded([]); }} />,
+          selectedRowKeys: allSelected ? (query.data || []).filter(row => canStart(row) && !excluded.includes(row.id)).map(row => row.id) : selected.map(row => row.id),
+          preserveSelectedRowKeys: !allSelected,
+          onSelect: (row, checked) => {
+            if (allSelected) setExcluded(ids => checked ? ids.filter(id => id !== row.id) : [...ids, row.id]);
+            else setSelected(rows => checked ? [...rows, row] : rows.filter(item => item.id !== row.id));
+          },
+          getCheckboxProps: row => ({ disabled: !canStart(row) }),
+        }}
         locale={{ emptyText: 'Заданий нет' }} columns={[
           { title: 'Запись / источник', width: 240, render: (_, row) => {
             const meta = row.meta as Record<string, unknown> | undefined;
@@ -174,16 +181,25 @@ export function Downloads() {
 export function Settings() {
   const query = useQuery({ queryKey: ['settings'], queryFn: () => request<Record<string, unknown>>('/settings'), refetchOnWindowFocus: false });
   const action = useAction();
+  const client = useQueryClient();
   const [form] = Form.useForm();
+  const guessRate = useMutation({
+    mutationFn: (enabled: boolean) => save<Record<string, unknown>>('/settings', 'PATCH', { quiz_guess_rate_enabled: enabled }),
+    onSuccess: result => client.setQueryData(['settings'], result),
+    onError: () => form.setFieldValue('quiz_guess_rate_enabled', query.data?.quiz_guess_rate_enabled),
+  });
   const { quiz_guess_rate_enabled, quiz_guess_rate_asked_threshold, source_429_retries, parser_stop_failures, ...other } = query.data || {};
   return <><PageTitle title="Настройки" subtitle="Параметры парсинга, загрузок и последовательность раундов"><Refresh onClick={() => void query.refetch()} /></PageTitle>
-    <Failure error={query.error || action.error} /><Card title="Конфигурация сервиса">
+    <Failure error={query.error || action.error || guessRate.error} /><Card title="Конфигурация сервиса">
       <Alert type="info" showIcon title="Настройки хранятся в PostgreSQL"
         description="Отключите учёт ответов, чтобы подбирать вопросы только по прослушиваниям YouTube Music." />
-      {query.data && <Form key={query.dataUpdatedAt} form={form} layout="vertical"
+      {query.data && <Form form={form} layout="vertical"
         initialValues={{ json: pretty(other), quiz_guess_rate_enabled, quiz_guess_rate_asked_threshold, source_429_retries, parser_stop_failures }}
         onFinish={({ json, ...values }) => action.mutate({ path: '/settings', method: 'PATCH', body: { ...JSON.parse(json), ...values } })}>
-        <Form.Item className="spaced" name="quiz_guess_rate_enabled" label="Учитывать правильные ответы" valuePropName="checked"><Switch /></Form.Item>
+        <Form.Item className="spaced" name="quiz_guess_rate_enabled" label="Учитывать правильные ответы" valuePropName="checked"
+          extra="Переключатель сохраняется сразу; остальные настройки — кнопкой ниже.">
+          <Switch loading={guessRate.isPending} disabled={guessRate.isPending || action.isPending} onChange={checked => guessRate.mutate(checked)} />
+        </Form.Item>
         <Form.Item name="quiz_guess_rate_asked_threshold" label="Порог числа показов"
           extra="Доля правильных ответов используется, когда число показов превышает порог."
           rules={[{ required: true, type: 'integer', min: 0 }]}>
@@ -199,7 +215,7 @@ export function Settings() {
           <InputNumber min={2} max={1000} precision={0} />
         </Form.Item>
         <Form.Item className="spaced" name="json" label="JSON настроек" rules={[{ validator: (_, value) => validateJSON(value) }]}><Input.TextArea autoSize={{ minRows: 18, maxRows: 32 }} className="code-input" /></Form.Item>
-        <Button htmlType="submit" type="primary" loading={action.isPending}>Сохранить настройки</Button>
+        <Button htmlType="submit" type="primary" loading={action.isPending} disabled={guessRate.isPending}>Сохранить настройки</Button>
       </Form>}
     </Card></>;
 }

@@ -182,7 +182,10 @@ export function Catalog({ resource, search }: { resource: CatalogResource; searc
       okText={editing === 'new' ? 'Создать' : 'Сохранить поля'} forceRender zIndex={1100}>
       <Failure error={action.error} />
       <Form form={form} layout="vertical" onFinish={submit}>
-        <Form.Item name="name" label="Название" rules={[{ required: true, whitespace: true, message: 'Введите название' }]}><Input maxLength={1000} /></Form.Item>
+        <Form.Item name="name" label="Название" dependencies={['yt_music_url']} rules={[({ getFieldValue }) => ({
+          validator: (_, value: string | undefined) => value?.trim() || (resource === 'artists' && editing === 'new' && getFieldValue('yt_music_url')?.trim())
+            ? Promise.resolve() : Promise.reject(new Error('Введите название или ссылку на исполнителя')),
+        })]}><Input maxLength={1000} /></Form.Item>
         <Form.Item name="yt_plays" label="Прослушивания YouTube Music"><InputNumber min={0} max={Number.MAX_SAFE_INTEGER} precision={0} /></Form.Item>
         <Form.Item name="excluded_from_quiz" valuePropName="checked"><Checkbox>Исключить из квиза</Checkbox></Form.Item>
         <Form.Item name="tags" label="Теги" extra="Управление списком — в разделе «Теги»"><Select mode="multiple" showSearch={{ optionFilterProp: 'label' }} options={tagOptions} loading={tags.isPending} disabled={tags.isError} /></Form.Item>

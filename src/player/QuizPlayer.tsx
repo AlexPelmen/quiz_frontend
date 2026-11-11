@@ -116,7 +116,7 @@ export function QuizPlayer() {
   const score = quizScore(correct, total);
   const question = step?.kind === 'question' ? step.question : null;
   const rule = step && step.kind !== 'finish' ? ruleFor(step.round.type) : null;
-  const hint = step?.kind === 'question' ? questionHint(step.question.secondary_text, step.round.type) : '';
+  const hint = step?.kind === 'question' ? questionHint(step.question.secondary_text, step.round.type, step.question.answer) : '';
   const revealed = question !== null && (game?.revealed.has(question.id) ?? false);
   const marked = question ? game?.answers[question.id] : undefined;
   const result = step?.kind === 'result' ? game?.results[step.round.id] : undefined;

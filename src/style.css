@@ -29,6 +29,11 @@ h1 { margin: 0 0 9px; font-size: 28px; letter-spacing: -.6px; font-weight: 650; 
 .catalog-related li { padding: 8px 0; border-bottom: 1px solid #eceef4; }
 .catalog-related-link { display: flex; width: fit-content; max-width: 100%; margin-top: 12px; }
 .catalog-upload { border-top: 1px solid #eceef4; padding-top: 16px; }
+.storage-orphans-header { padding: 20px; }
+.storage-orphans-header h5.ant-typography { margin: 0 0 16px; }
+.storage-orphans-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; }
+.storage-orphans > .ant-alert { margin: 0 20px 16px; }
+.storage-file-path { overflow-wrap: anywhere; }
 .audio-row audio { display: block; }
 .pager { display: flex; justify-content: flex-end; align-items: center; gap: 16px; padding: 16px 20px; }
 .spaced { margin-top: 20px; }
@@ -43,4 +48,4 @@ audio { width: 100%; max-width: 360px; height: 40px; margin: 10px 0; }
 .question { margin-bottom: 12px; }
 details { margin-top: 12px; cursor: pointer; }
 .connection-error { margin-bottom: 24px; }
-@media (max-width: 760px) { .content { padding: 20px 12px; } .topbar { padding: 0 14px; } .topbar > span:first-child { display: none; } .page-title { align-items: flex-start; flex-direction: column; } h1 { font-size: 24px; } .toolbar { padding: 12px; } .pager { gap: 8px; justify-content: center; } }
+@media (max-width: 760px) { .content { padding: 20px 12px; } .topbar { padding: 0 14px; } .topbar > span:first-child { display: none; } .page-title { align-items: flex-start; flex-direction: column; } h1 { font-size: 24px; } .toolbar { padding: 12px; } .storage-orphans-header { padding: 16px 12px; } .storage-orphans > .ant-alert { margin: 0 12px 16px; } .pager { gap: 8px; justify-content: center; } }

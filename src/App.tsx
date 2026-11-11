@@ -11,6 +11,7 @@ import { Packs } from './Packs';
 import { Console } from './Console';
 import { Tags } from './Tags';
 import { AlbumGuessing } from './AlbumGuessing';
+import { Storage } from './Storage';
 
 const sections = [
   { key: 'artists', icon: <TeamOutlined />, label: 'Исполнители' },
@@ -22,6 +23,7 @@ const sections = [
   { key: 'album-cleanup', icon: <DatabaseOutlined />, label: 'Очистка альбомов' },
   { key: 'parsing-errors', icon: <WarningOutlined />, label: 'Ошибки парсинга' },
   { key: 'downloads', icon: <DownloadOutlined />, label: 'Загрузки' },
+  { key: 'storage', icon: <DatabaseOutlined />, label: 'Файловое хранилище' },
   { key: 'packs', icon: <AppstoreOutlined />, label: 'Квиз-пакеты' },
   { key: 'tags', icon: <TagOutlined />, label: 'Теги' },
   { key: 'settings', icon: <SettingOutlined />, label: 'Настройки' },
@@ -55,7 +57,7 @@ export function App() {
           : section === 'album-guessing' ? <AlbumGuessing />
           : section === 'parsing-logs' ? <ParsingLogs search={search} />
           : section === 'album-cleanup' ? <AlbumCleanup />
-          : section === 'parsing' ? <Parsing /> : section === 'parsing-errors' ? <ParsingErrors /> : section === 'downloads' ? <Downloads /> : section === 'packs' ? <Packs /> : section === 'tags' ? <Tags /> : section === 'settings' ? <Settings /> : <Console />}
+          : section === 'parsing' ? <Parsing /> : section === 'parsing-errors' ? <ParsingErrors /> : section === 'downloads' ? <Downloads /> : section === 'storage' ? <Storage /> : section === 'packs' ? <Packs /> : section === 'tags' ? <Tags /> : section === 'settings' ? <Settings /> : <Console />}
       </Layout.Content><Layout.Footer className="footer">Music Quiz · От каталога исполнителей до готового раунда</Layout.Footer>
     </Layout>
   </Layout>;
