@@ -5,6 +5,7 @@ import ruRU from 'antd/locale/ru_RU';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { App } from './App';
 import { QuizPlayer } from './player/QuizPlayer';
+import { AuthGate } from './Auth';
 import 'antd/dist/reset.css';
 import './style.css';
 
@@ -19,7 +20,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
       token: { colorPrimary: '#d9ff66', colorBgBase: '#13101b', colorTextLightSolid: '#16121c', borderRadius: 12, fontFamily: 'Inter, Segoe UI, sans-serif' },
       components: { Button: { primaryColor: '#16121c' }, Modal: { contentBg: '#21192c', headerBg: '#21192c' } },
     } : { token: { colorPrimary: '#6254d9', borderRadius: 10, fontFamily: 'Inter, Segoe UI, sans-serif' } }}>
-      <AntApp>{isPlayer ? <QuizPlayer /> : <App />}</AntApp>
+      <AntApp><AuthGate>{isPlayer ? <QuizPlayer /> : <App />}</AuthGate></AntApp>
     </ConfigProvider>
   </QueryClientProvider></React.StrictMode>,
 );

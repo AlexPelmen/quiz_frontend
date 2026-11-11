@@ -7,6 +7,7 @@ import {
 } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { fileURL, request, save } from '../api';
+import { useAuth } from '../Auth';
 import { difficultyLabels, questionAudioURL, questionCoverURL, questionHint, quizScore, ruleFor } from '../quiz';
 import type { QuizPack, QuizPackSummary, QuizQuestion, QuizRound, RoundResult } from '../quiz';
 import { QuizAnswer } from './QuizAnswer';
@@ -78,6 +79,7 @@ function QuizImage({ src }: { src: string }) {
 }
 
 export function QuizPlayer() {
+  const { can } = useAuth();
   const [sound, setSound] = useState<boolean | null>(null);
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<string | null>(null);
@@ -223,7 +225,7 @@ export function QuizPlayer() {
         <span className="mq-brand-icon" aria-hidden="true">♫</span><span>MUSIC<span className="mq-brand-accent">QUIZ</span></span>
       </button>
       <nav aria-label="Навигация">
-        <Button type="text" href="/#packs" className="mq-admin">Студия пакетов</Button>
+        <Button type="text" href={can('packs') ? '/#packs' : '/#profile'} className="mq-admin">{can('packs') ? 'Студия пакетов' : 'Мой профиль'}</Button>
         <Button className="mq-sound-button" aria-pressed={sound === true} disabled={sound === null}
           icon={sound ? <SoundOutlined /> : <MutedOutlined />} onClick={() => changeSound(!sound)}>
           Звук <span className="mq-sound-state">{sound ? 'вкл.' : 'выкл.'}</span>
@@ -253,7 +255,7 @@ export function QuizPlayer() {
             {loadError && <Alert type="error" showIcon title="Не удалось загрузить список пакетов" description={loadError.message} />}
             {packs.isSuccess && !packs.data?.length && <Empty className="mq-empty"
               description={page === 1 ? 'Пакетов пока нет. Создайте первый в студии.' : 'На этой странице пакетов нет.'}>
-              {page === 1 && <Button href="/#packs">Открыть студию пакетов</Button>}
+              {page === 1 && can('packs') && <Button href="/#packs">Открыть студию пакетов</Button>}
             </Empty>}
             <div className="mq-pack-grid">{packs.data?.map((item, index) => <Card className="mq-pack-card" key={item.id}
               cover={item.cover_download_id ? <img className="mq-pack-cover" src={fileURL(item.cover_download_id)} alt="" />

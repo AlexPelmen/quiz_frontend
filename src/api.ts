@@ -19,6 +19,10 @@ export interface Entity {
   [key: string]: unknown;
 }
 
+export class ApiError extends Error {
+  constructor(message: string, public readonly status: number) { super(message); }
+}
+
 export async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const headers = new Headers(options.headers);
   if (!headers.has('Content-Type') && !(options.body instanceof FormData)) {
@@ -29,8 +33,9 @@ export async function request<T>(path: string, options: RequestInit = {}): Promi
     headers,
   });
   if (!response.ok) {
+    if (response.status === 401 && path !== '/auth/me' && path !== '/auth/login') window.dispatchEvent(new Event('quiz:unauthorized'));
     const body = await response.json().catch(() => null);
-    throw new Error(body?.error || `Ошибка HTTP ${response.status}`);
+    throw new ApiError(body?.error || `Ошибка HTTP ${response.status}`, response.status);
   }
   return response.status === 204 ? undefined as T : response.json();
 }

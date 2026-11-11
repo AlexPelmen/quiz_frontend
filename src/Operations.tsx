@@ -64,7 +64,7 @@ export function ParsingErrors() {
       { title: 'Статус', dataIndex: 'status', width: 130, render: value => <Status value={value} /> },
       { title: 'Последняя ошибка', dataIndex: 'error', render: (value: string) => value ? <Typography.Text copyable>{value}</Typography.Text> : <span className="muted">Нет сохранённой ошибки</span> },
       { title: 'Обновлено', dataIndex: 'updated_at', width: 170, render: date },
-      { title: 'Действия', width: 180, render: (_, row) => status === 'manual' && <Button loading={action.isPending} onClick={() => action.mutate({ path: `/artists/${row.id}`, method: 'PATCH', body: { status: 'created' } })}>Вернуть в очередь</Button> },
+      { title: 'Действия', width: 180, render: (_, row) => status === 'manual' && <Button loading={action.isPending} onClick={() => action.mutate({ path: `/parsing-errors/${row.id}/requeue` })}>Вернуть в очередь</Button> },
     ]} /><div className="pager"><Button disabled={page === 1} onClick={() => setPage(page - 1)}>Назад</Button>Страница {page}<Button disabled={(query.data?.length || 0) < 20} onClick={() => setPage(page + 1)}>Далее</Button></div></div></>;
 }
 
