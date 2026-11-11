@@ -3,7 +3,7 @@ import { Spin } from 'antd';
 import { CheckOutlined, CustomerServiceOutlined } from '@ant-design/icons';
 import { useQuery } from '@tanstack/react-query';
 import { fileURL, request } from '../api';
-import type { QuizQuestion } from '../quiz';
+import { questionName, type QuizQuestion } from '../quiz';
 
 const labels: Record<string, string> = { artist: 'Исполнитель', track: 'Трек', album: 'Альбом', release: 'Релиз' };
 
@@ -41,8 +41,9 @@ export function QuizAnswer({ question, roundType }: { question: QuizQuestion; ro
     queryFn: ({ signal }) => request<{ id: string; name: string }[]>(`/tracks/${encodeURIComponent(question.track_id || '')}/artists`, { signal }),
     enabled: !!question.track_id,
   });
-  const names = contributors.data?.map(item => item.name).filter(Boolean) || [];
-  const selectedName = contributors.data?.find(item => item.id === question.artist_id)?.name;
+  const names = contributors.data?.map(item => questionName(item.name)).filter(Boolean) || [];
+  const selected = contributors.data?.find(item => item.id === question.artist_id)?.name;
+  const selectedName = selected ? questionName(selected) : undefined;
   const artistNames = selectedName ? [selectedName, ...names.filter(name => name !== selectedName)] : names;
   const displayedArtists = artistNames.length > 1 ? artistNames.join(' и ') : '';
   const knownLogo = roundType === 'artist_by_logo' ? question.image_download_id : null;
@@ -61,7 +62,7 @@ export function QuizAnswer({ question, roundType }: { question: QuizQuestion; ro
   const artworkId = isTrack ? album.data?.cover_download_id ?? artist.data?.logo_download_id : knownLogo ?? artist.data?.logo_download_id;
   const artworkQuery = isTrack ? album : artist;
   const facts = Object.entries({
-    ...question.answer_info,
+    ...Object.fromEntries(Object.entries(question.answer_info || {}).map(([key, value]) => [key, typeof value === 'string' ? questionName(value) : value])),
     ...(isTrack && displayedArtists ? { artist: displayedArtists } : {}),
     ...(album.data?.release_date ? { release: album.data.release_date } : {}),
   }).filter(([key, value]) =>
@@ -76,7 +77,7 @@ export function QuizAnswer({ question, roundType }: { question: QuizQuestion; ro
       {artworkId && <AnswerImage key={artworkId} id={artworkId} fallbackId={isTrack && artworkId !== artist.data?.logo_download_id ? artist.data?.logo_download_id : null} showBackdrop={!isTrack} />}
       <div className="mq-answer-caption" role="status">
         <div className="mq-kicker"><CheckOutlined /> {isTrack ? 'УГАДЫВАЛИ ТРЕК' : 'УГАДЫВАЛИ ИСПОЛНИТЕЛЯ'}</div>
-        <h2>{!isTrack && displayedArtists ? displayedArtists : question.answer}</h2>
+        <h2>{!isTrack && displayedArtists ? displayedArtists : questionName(question.answer)}</h2>
       </div>
       {artworkQuery.isLoading && <div className="mq-answer-loading"><Spin size="small" aria-label="Загружаем изображение" /></div>}
       {artworkQuery.isError && !artworkId && <span className="mq-answer-image-error" role="status">Изображение недоступно</span>}

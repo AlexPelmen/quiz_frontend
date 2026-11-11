@@ -56,11 +56,23 @@ export const questionAudioURL = (packId: string, number: number) =>
 export const questionCoverURL = (packId: string, number: number) =>
   `/api/v1/quiz-packs/${encodeURIComponent(packId)}/questions/${number}/cover`;
 
+export function questionName(value: string) {
+  let result = value;
+  let previous: string;
+  do {
+    previous = result;
+    result = result.replace(/\([^()]*\)/gu, '');
+  } while (result !== previous);
+  return result.replace(/[^\S\r\n]+/gu, ' ').replace(/^ +| +$/gmu, '').trim();
+}
+
 export function questionHint(text: string, roundType: string, answer?: string) {
   if (roundType === 'artist_cities' || roundType === 'artist_alphabet') return '';
   // В ранее созданных пакетах начальные A и An ошибочно пропускались.
-  if (roundType === 'artist_initial' && /^\s*a(?:n)?\s+\S/iu.test(answer || '')) return 'A/А';
+  if (roundType === 'artist_initial' && /^a(?:n)?\s+\S/iu.test(questionName(answer || ''))) return 'A/А';
+  if (roundType === 'artist_growth' && answer) return `Букв в названии: ${(questionName(answer).match(/\p{L}/gu) || []).length}`;
   // В сохранённых пакетах согласные могли быть записаны как подчёркивания.
+  text = questionName(text);
   return roundType === 'track_vowels' ? text.replaceAll('_', '').replace(/\s+/g, ' ').trim().toLowerCase() : text;
 }
 
