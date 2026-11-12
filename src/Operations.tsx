@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { date, Entity, fileURL, pretty, request, save } from './api';
 import { Failure, PageTitle, Refresh, Status, useAction } from './shared';
 import './downloads.css';
+import { useAuth } from './Auth';
 
 const providers = [
   { id: 'yt_music', name: 'YouTube Music', fields: 'Карточка, логотип, подписчики, месячная аудитория, популярные альбомы и треки, обложки, длительности и счётчики.' },
@@ -17,12 +18,12 @@ export function providerName(value: unknown) {
 }
 
 export function Parsing() {
+  const { can } = useAuth();
   const query = useQuery({ queryKey: ['parsing-runs'], queryFn: () => request<Entity[]>('/parsing-runs?limit=100'), refetchInterval: 3000 });
   const action = useAction();
   const active = query.data?.some(row => ['pending', 'running', 'stopping'].includes(row.status || ''));
   return <><PageTitle title="Парсинг каталога" subtitle="YouTube Music, Genius и MusicBrainz · состояние обновляется каждые 3 секунды">
-    <Refresh onClick={() => void query.refetch()} /><Button href="#parsing-errors">Ошибки исполнителей</Button><Button href="#parsing-logs">Журнал</Button>
-    <Button href="#album-cleanup">Очистка альбомов</Button>
+    <Refresh onClick={() => void query.refetch()} />{can('parsing-errors') && <Button href="#parsing-errors">Ошибки исполнителей</Button>}{can('parsing-logs') && <Button href="#parsing-logs">Журнал парсинга</Button>}
   </PageTitle><Failure error={query.error || action.error} />
     <Row gutter={[12, 12]}>
       {providers.map(provider => <Col key={provider.id} xs={24} md={12} xl={8}>
@@ -40,7 +41,7 @@ export function Parsing() {
       { title: 'Запуск', dataIndex: 'created_at', render: date }, { title: 'Статус', dataIndex: 'status', render: value => <Status value={value} /> },
       { title: 'Провайдер', dataIndex: 'provider', render: providerName },
       { title: 'Действие', render: (_, row) => ['pending', 'running'].includes(row.status || '') ? <Button danger loading={action.isPending} onClick={() => action.mutate({ path: `/parsing-runs/${row.id}/stop` })}>Остановить</Button> : row.status === 'stopping' ? 'Ожидание завершения исполнителя' : '—' },
-      { title: 'Журнал', render: (_, row) => <Button href={`#parsing-logs?run=${row.id}`}>Открыть</Button> },
+      { title: 'Журнал', render: (_, row) => can('parsing-logs') ? <Button href={`#parsing-logs?run=${row.id}`}>Открыть</Button> : '—' },
       { title: 'Исполнителей', dataIndex: 'processed' }, { title: 'Полей', dataIndex: 'fields' },
       { title: 'Альбомов', dataIndex: 'albums' }, { title: 'Треков', dataIndex: 'tracks' },
       { title: 'Сбоев', dataIndex: 'errors' }, { title: 'Причина остановки', dataIndex: 'error', ellipsis: true },

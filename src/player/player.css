@@ -431,3 +431,6 @@
   .mq-splash { display: none; }
   .mq-pack-card.ant-card { transition: none; }
 }
+
+.mq-feedback { display: grid; gap: 8px; width: 100%; }
+.mq-feedback > span { color: #d6c8fb; font-size: 13px; }

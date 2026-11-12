@@ -34,14 +34,14 @@ export function AuthGate({ children }: { children: ReactNode }) {
   </Card></div>;
   const user = me.data;
   const can = (section: string) => user.role === 'admin' || section === 'profile' || section === 'player'
-    || user.role === 'moderator' && section === 'album-guessing' || user.permissions.includes(section);
+    || user.role === 'moderator' && section === 'album-guessing' || ['parsing-logs', 'parsing-errors'].includes(section) && user.permissions.includes('parsing') || user.permissions.includes(section);
   return <AuthContext.Provider value={{ user, can, logout: () => logout.mutate(), logoutError: logout.error, logoutPending: logout.isPending }}>{children}</AuthContext.Provider>;
 }
 
 const permissions = [
   ['artists','Исполнители'], ['albums','Альбомы'], ['tracks','Треки'], ['album-guessing','Модерация обложек'],
-  ['album-cleanup','Очистка альбомов'], ['parsing','Парсинг'], ['parsing-logs','Журнал парсинга'], ['parsing-errors','Ошибки парсинга'],
-  ['downloads','Загрузки'], ['storage','Файловое хранилище'], ['packs','Квиз-пакеты'], ['tags','Теги'], ['settings','Настройки'], ['console','API-консоль'], ['users','Пользователи'],
+  ['parsing','Парсинг'], ['parsing-logs','Журнал парсинга'], ['parsing-errors','Ошибки парсинга'],
+  ['question-feedback','Обратная связь'], ['downloads','Загрузки'], ['storage','Файловое хранилище'], ['packs','Квиз-пакеты'], ['tags','Теги'], ['settings','Настройки'], ['console','API-консоль'], ['users','Пользователи'],
 ].map(([value,label]) => ({ value,label }));
 
 export function Profile() {

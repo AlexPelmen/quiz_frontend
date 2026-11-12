@@ -11,6 +11,7 @@ import { useAuth } from '../Auth';
 import { difficultyLabels, questionAudioURL, questionCoverURL, questionHint, quizScore, ruleFor } from '../quiz';
 import type { QuizPack, QuizPackSummary, QuizQuestion, QuizRound, RoundResult } from '../quiz';
 import { QuizAnswer } from './QuizAnswer';
+import { QuestionFeedback } from './QuestionFeedback';
 import { useQuizAudio } from './useQuizAudio';
 import './player.css';
 
@@ -196,7 +197,7 @@ export function QuizPlayer() {
   const onKeyDown = useEffectEvent((event: KeyboardEvent) => {
     if (!game || sound === null || event.repeat || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey || event.defaultPrevented) return;
     const target = event.target;
-    if (target instanceof HTMLElement && target.closest('input, textarea, select, [contenteditable="true"]')) return;
+    if (target instanceof HTMLElement && target.closest('input, textarea, select, [contenteditable="true"], [role="dialog"]')) return;
     if (event.key === 'ArrowRight' || event.key === 'ArrowLeft') {
       event.preventDefault();
       move(event.key === 'ArrowRight' ? 1 : -1);
@@ -355,6 +356,7 @@ export function QuizPlayer() {
               </div>
               {audio.error && <Alert type="warning" showIcon title={audio.error} />}
             </>}
+            <QuestionFeedback key={step.question.id} questionID={step.question.id} />
             <Button size="large" type={revealed ? 'default' : 'primary'} aria-expanded={revealed}
               aria-controls={revealed ? 'mq-answer' : undefined}
               icon={revealed ? <ArrowUpOutlined /> : <ArrowDownOutlined />} onClick={() => showAnswer(!revealed)}>

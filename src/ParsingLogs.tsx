@@ -1,8 +1,7 @@
-import { useState } from 'react';
-import { Alert, Button, Card, Popconfirm, Select, Space, Table, Tag, Typography } from 'antd';
+import { Alert, Button, Card, Select, Space, Table, Typography } from 'antd';
 import { useQuery } from '@tanstack/react-query';
 import { date, Entity, request } from './api';
-import { Failure, PageTitle, Refresh, Status, statusLabel, useAction } from './shared';
+import { Failure, PageTitle, Refresh, Status, statusLabel } from './shared';
 import { providerName } from './Operations';
 
 interface ParseEvent {
@@ -11,13 +10,6 @@ interface ParseEvent {
   stage: string;
   message: string;
   created_at: string;
-}
-
-interface CleanupRow {
-  id: string;
-  artist: string;
-  album: string;
-  protected: boolean;
 }
 
 export function ParsingLogs({ search }: { search?: string }) {
@@ -67,51 +59,6 @@ export function ParsingLogs({ search }: { search?: string }) {
           { title: 'Этап', dataIndex: 'stage', width: 140 },
           { title: 'Сообщение', dataIndex: 'message', render: value => <Typography.Text style={{ overflowWrap: 'anywhere' }}>{value}</Typography.Text> },
         ]} />
-    </Card>
-  </>;
-}
-
-export function AlbumCleanup() {
-  const [page, setPage] = useState(1);
-  const [selected, setSelected] = useState<string[]>([]);
-  const action = useAction();
-  const pageSize = 40;
-  const candidates = useQuery({
-    queryKey: ['album-cleanup', page],
-    queryFn: ({ signal }) => request<CleanupRow[]>(`/album-cleanup?limit=${pageSize + 1}&offset=${(page - 1) * pageSize}`, { signal }),
-  });
-  const count = useQuery({ queryKey: ['album-cleanup', 'count'], queryFn: ({ signal }) => request<{ count: number }>('/album-cleanup/count', { signal }) });
-  const rows = candidates.data?.slice(0, pageSize);
-  return <>
-    <PageTitle title="Очистка альбомов" subtitle="Просмотр и удаление альбомов вне подборки YouTube Music">
-      <Button href="#parsing">К парсингу</Button>
-      <Refresh onClick={() => { setSelected([]); void candidates.refetch(); }} />
-    </PageTitle>
-    <Failure error={candidates.error || count.error} />
-    <Failure error={action.error} />
-    <Alert showIcon type="info" title="Подборки формируются при парсинге через YouTube Music"
-      description="Здесь появятся лишние альбомы исполнителей с полной подборкой из рейтинга YouTube Music. Размер подборки зависит от числа подписчиков. Альбомы из готовых квизов защищены. При удалении альбома связанные треки остаются в каталоге." />
-    <Card className="spaced" size="small">
-      <Popconfirm title={`Удалить выбранные альбомы (${selected.length})?`}
-        description="Будут удалены записи альбомов и их разметка."
-        okText="Удалить" cancelText="Отмена" okButtonProps={{ danger: true }}
-        onConfirm={() => action.mutateAsync({ path: '/album-cleanup', body: { ids: selected } })
-          .then(() => { setSelected([]); setPage(1); })}>
-        <Button danger disabled={selected.length === 0 || candidates.isFetching} loading={action.isPending}>
-          Удалить выбранные ({selected.length})
-        </Button>
-      </Popconfirm>
-      <div className="table-total table-total-inset spaced">Всего: {count.data?.count?.toLocaleString('ru-RU') ?? '—'}</div>
-      <Table<CleanupRow> rowKey="id" loading={candidates.isPending} dataSource={rows}
-        pagination={{ current: page, pageSize, total: count.data?.count, showSizeChanger: false, onChange: next => { setSelected([]); setPage(next); } }} scroll={{ x: 480 }} locale={{ emptyText: 'Альбомов для очистки пока нет.' }}
-        rowSelection={{ selectedRowKeys: selected, onChange: keys => setSelected(keys.map(String)),
-          getCheckboxProps: row => ({ disabled: row.protected || action.isPending }) }}
-        columns={[
-          { title: 'Исполнитель', dataIndex: 'artist' },
-          { title: 'Альбом', dataIndex: 'album' },
-          { title: 'Удаление', dataIndex: 'protected', render: value => value ? <Tag color="warning">В квизе</Tag> : 'Доступно' },
-        ]} />
-
     </Card>
   </>;
 }
