@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { Alert, Button, Card, Checkbox, Col, Form, Input, InputNumber, Modal, Row, Select, Space, Switch, Table, Tabs, Tag, Typography } from 'antd';
-import { CaretRightOutlined } from '@ant-design/icons';
+import { Alert, Button, Card, Checkbox, Col, Form, Input, InputNumber, Modal, Progress, Row, Select, Space, Switch, Table, Tabs, Tag, Typography } from 'antd';
+import { CaretRightOutlined, CloudDownloadOutlined } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { date, Entity, fileURL, pretty, request, save } from './api';
 import { Failure, PageTitle, Refresh, Status, useAction } from './shared';
+import './downloads.css';
 
 const providers = [
   { id: 'yt_music', name: 'YouTube Music', fields: 'Карточка, логотип, подписчики, месячная аудитория, популярные альбомы и треки, обложки, длительности и счётчики.' },
@@ -35,7 +36,7 @@ export function Parsing() {
         </Card>
       </Col>)}
     </Row>
-    <div className="panel spaced"><Table<Entity> rowKey="id" dataSource={query.data} loading={query.isFetching} scroll={{ x: 1040 }} columns={[
+    <div className="panel spaced"><div className="table-total">Всего показано запусков: {query.data?.length.toLocaleString('ru-RU') ?? '—'}</div><Table<Entity> rowKey="id" dataSource={query.data} loading={query.isFetching} scroll={{ x: 1040 }} columns={[
       { title: 'Запуск', dataIndex: 'created_at', render: date }, { title: 'Статус', dataIndex: 'status', render: value => <Status value={value} /> },
       { title: 'Провайдер', dataIndex: 'provider', render: providerName },
       { title: 'Действие', render: (_, row) => ['pending', 'running'].includes(row.status || '') ? <Button danger loading={action.isPending} onClick={() => action.mutate({ path: `/parsing-runs/${row.id}/stop` })}>Остановить</Button> : row.status === 'stopping' ? 'Ожидание завершения исполнителя' : '—' },
@@ -52,20 +53,21 @@ export function ParsingErrors() {
   const action = useAction();
   const query = useQuery({ queryKey: ['parsing-errors', status, page],
     queryFn: () => request<Entity[]>(`/artists?status=${status}&limit=20&offset=${(page - 1) * 20}`), refetchInterval: 5000 });
+  const count = useQuery({ queryKey: ['artists', 'count', status], queryFn: ({ signal }) => request<{ count: number }>(`/artists/count?status=${status}`, { signal }), refetchInterval: 5000 });
   return <><PageTitle title="Ошибки парсинга" subtitle="Причины ошибок исполнителей и ручная обработка">
     <Refresh onClick={() => void query.refetch()} /><Button href="#parsing">К запускам</Button></PageTitle>
-    <Failure error={query.error} /><Alert type="info" showIcon title="Ошибки повторяются при следующем запуске"
+    <Failure error={query.error || count.error} /><Alert type="info" showIcon title="Ошибки повторяются при следующем запуске"
       description="Исполнителей с ручным статусом можно вернуть в очередь." />
     <div className="panel spaced"><div className="toolbar"><Select value={status} style={{ width: 250 }} onChange={value => { setStatus(value); setPage(1); }} options={[
       { value: 'error', label: 'Завершились ошибкой' }, { value: 'partial', label: 'Частично заполнены' },
       { value: 'errored', label: 'Ошибки прежних запусков' }, { value: 'manual', label: 'Ручная обработка' },
-    ]} /></div><Table<Entity> rowKey="id" dataSource={query.data} loading={query.isPending} pagination={false} scroll={{ x: 800 }} columns={[
+    ]} /></div><div className="table-total">Всего: {count.data?.count?.toLocaleString('ru-RU') ?? '—'}</div><Table<Entity> rowKey="id" dataSource={query.data} loading={query.isPending} pagination={{ current: page, pageSize: 20, total: count.data?.count, showSizeChanger: false, onChange: setPage }} scroll={{ x: 800 }} columns={[
       { title: 'Исполнитель', dataIndex: 'name', width: 200 },
       { title: 'Статус', dataIndex: 'status', width: 130, render: value => <Status value={value} /> },
       { title: 'Последняя ошибка', dataIndex: 'error', render: (value: string) => value ? <Typography.Text copyable>{value}</Typography.Text> : <span className="muted">Нет сохранённой ошибки</span> },
       { title: 'Обновлено', dataIndex: 'updated_at', width: 170, render: date },
       { title: 'Действия', width: 180, render: (_, row) => status === 'manual' && <Button loading={action.isPending} onClick={() => action.mutate({ path: `/parsing-errors/${row.id}/requeue` })}>Вернуть в очередь</Button> },
-    ]} /><div className="pager"><Button disabled={page === 1} onClick={() => setPage(page - 1)}>Назад</Button>Страница {page}<Button disabled={(query.data?.length || 0) < 20} onClick={() => setPage(page + 1)}>Далее</Button></div></div></>;
+    ]} /></div></>;
 }
 
 const downloaders = [
@@ -89,44 +91,83 @@ export function Downloads() {
   const [page, setPage] = useState(1);
   const [editing, setEditing] = useState<Entity | null>(null);
   const [selected, setSelected] = useState<Entity[]>([]);
-	const [queued, setQueued] = useState<number | null>(null);
+  const [queued, setQueued] = useState<number | null>(null);
+  const [starting, setStarting] = useState(false);
+  const [startError, setStartError] = useState<Error | null>(null);
+  const [progress, setProgress] = useState(readDownloadProgress);
+  const [storageError, setStorageError] = useState<string | null>(null);
   const [form] = Form.useForm();
   const action = useAction();
   const query = useQuery({ queryKey: ['downloads', status, kind, page], queryFn: ({ signal }) => request<Entity[]>(`/downloads?limit=20&offset=${(page - 1) * 20}&status=${status}&file_type=${kind}`, { signal }), refetchInterval: 3000 });
+  const active = useQuery({ queryKey: ['downloads-active-count', kind], queryFn: ({ signal }) => request<{ active: number }>(`/downloads/active-count?file_type=${kind}`, { signal }), refetchInterval: 3000 });
+  const count = useQuery({ queryKey: ['downloads', 'count', status, kind], queryFn: ({ signal }) => request<{ count: number }>(`/downloads/count?status=${status}&file_type=${kind}`, { signal }), refetchInterval: 3000 });
   const clearSelection = () => { setSelected([]); setAllSelected(false); setExcluded([]); };
   const canStartSelection = allSelected || (selected.length > 0 && selected.length <= 200
     && selected.every(row => canStart(query.data?.find(current => current.id === row.id) || row)));
-  const start = (downloader: string) => action.mutate({
-    path: '/downloads/start', body: allSelected
-      ? { downloader, all_matching: true, status, excluded_ids: excluded }
-      : { downloader, download_ids: selected.map(row => row.id) },
-  }, { onSuccess: result => { clearSelection(); setQueued((result as { queued: number }).queued); } });
+  const runStart = async (path: string, body: unknown, fileKind: string, batch: boolean) => {
+    setStarting(true);
+    setStartError(null);
+    try {
+      const before = await request<{ active: number }>(`/downloads/active-count?file_type=${fileKind}`);
+      const result = await action.mutateAsync({ path, body });
+      const added = batch ? (result as { queued: number }).queued : 1;
+      if (added > 0) {
+        const next = { ...progress, [fileKind]: before.active + added };
+        setProgress(next);
+        try {
+          localStorage.setItem(downloadProgressKey, JSON.stringify(next));
+          setStorageError(null);
+        } catch {
+          setStorageError('Не удалось сохранить прогресс в браузере. После обновления страницы он может потеряться.');
+        }
+      }
+      setQueued(added);
+      clearSelection();
+      setEditing(null);
+      void active.refetch();
+    } catch (error) {
+      setStartError(error instanceof Error ? error : new Error('Не удалось запустить загрузку'));
+    } finally {
+      setStarting(false);
+    }
+  };
+  const start = (downloader: string) => void runStart('/downloads/start', allSelected
+    ? { downloader, all_matching: true, status, excluded_ids: excluded }
+    : { downloader, download_ids: selected.map(row => row.id) }, kind, true);
 
   return <>
     <PageTitle title="Загрузки и медиатека" subtitle="Отметьте задания и запустите нужный загрузчик">
       <Refresh onClick={() => void query.refetch()} />
     </PageTitle>
-    <Failure error={query.error || action.error} />
-    <div className="panel">
-      <Tabs activeKey={kind} onChange={value => { setKind(value); setPage(1); clearSelection(); }} items={[
+    <Failure error={query.error || count.error || active.error || startError || action.error} />
+    {storageError && <Alert type="warning" showIcon title={storageError} className="downloads-notice" />}
+    <DownloadProgress kind={kind} active={active.data?.active} total={progress[kind]} />
+    <div className="panel downloads-panel">
+      <Tabs className="downloads-tabs" activeKey={kind} onChange={value => { setKind(value); setPage(1); clearSelection(); setQueued(null); }} items={[
         { key: 'mp3', label: 'Музыка' }, { key: 'image', label: 'Изображения' },
       ]} />
-      {queued !== null && <Alert type="success" showIcon title={`Добавлено в очередь: ${queued}`} />}
-      <Space wrap className="toolbar">
-        {downloaders.filter(item => kind === 'image' ? item.key === 'image' : item.key !== 'image').map(({ key, label }) =>
-          <Button key={key} loading={action.isPending} disabled={!canStartSelection} onClick={() => start(key)}>Запустить {label}</Button>)}
-      </Space>
-      <div className="toolbar">
-        <Select aria-label="Состояние загрузки" value={status} style={{ width: 220 }} onChange={value => { setStatus(value); setPage(1); clearSelection(); }} options={[
+      <div className="downloads-controls">
+        <div className="downloads-controls-heading">
+          <div><strong>Задания</strong><span>Выберите записи и способ загрузки</span></div>
+          <div className="downloads-selection">{allSelected ? `Выбраны все подходящие${excluded.length ? ` · исключено ${excluded.length}` : ''}` : `Выбрано: ${selected.length}`}
+            {(!!selected.length || allSelected) && <Button type="link" onClick={clearSelection}>Снять выбор</Button>}
+          </div>
+        </div>
+        <div className="downloads-actions">
+          {downloaders.filter(item => kind === 'image' ? item.key === 'image' : item.key !== 'image').map(({ key, label }) =>
+            <Button key={key} loading={starting} disabled={!canStartSelection} onClick={() => start(key)}>{label}</Button>)}
+        </div>
+        {selected.length > 200 && <Typography.Text type="warning">За один запуск можно выбрать до 200 заданий.</Typography.Text>}
+        {queued !== null && <Alert type="success" showIcon closable onClose={() => setQueued(null)} title={`Добавлено в очередь: ${queued}`} />}
+      </div>
+      <div className="downloads-table-heading">
+        <div className="downloads-table-title"><strong>Список загрузок</strong><span>Всего: {count.data?.count?.toLocaleString('ru-RU') ?? '—'}</span></div>
+        <Select aria-label="Состояние загрузки" value={status} onChange={value => { setStatus(value); setPage(1); clearSelection(); }} options={[
           ['', 'Все состояния'], ['created', 'Ждёт запуска'], ['pending', 'В очереди'], ['processing', 'В обработке'],
           ['finished', 'Завершено'], ['errored', 'Ошибка'], ['manual', 'Нужен источник'],
         ].map(([value, label]) => ({ value, label }))} />
-        <Typography.Text>{allSelected ? `Выбраны все подходящие задания${excluded.length ? `, исключено ${excluded.length}` : ''}` : `Выбрано ${selected.length}`}</Typography.Text>
-        {(!!selected.length || allSelected) && <Button onClick={clearSelection}>Снять выбор</Button>}
-        {selected.length > 200 && <Typography.Text type="warning">За один запуск можно выбрать до 200 заданий.</Typography.Text>}
-
       </div>
-      <Table<Entity> rowKey="id" loading={query.isPending} dataSource={query.data} pagination={false} scroll={{ x: 980 }}
+      <Table<Entity> rowKey="id" loading={query.isPending} dataSource={query.data} pagination={{ current: page, pageSize: 20, total: count.data?.count, showSizeChanger: false, onChange: setPage }} scroll={{ x: 980 }}
         rowSelection={{
           columnTitle: <Checkbox aria-label="Выбрать все задания" checked={allSelected}
             disabled={!!status && !['created', 'errored', 'manual'].includes(status)}
@@ -165,17 +206,48 @@ export function Downloads() {
             {row.status === 'finished' && <a href={fileURL(row.id)} target="_blank" rel="noreferrer">Открыть файл</a>}
           </Space> },
         ]} expandable={{ expandedRowRender: row => <pre>{pretty(row)}</pre> }} />
-      <div className="pager"><Button disabled={page === 1} onClick={() => setPage(page - 1)}>Назад</Button>Страница {page}<Button disabled={(query.data?.length || 0) < 20} onClick={() => setPage(page + 1)}>Далее</Button></div>
     </div>
     <Modal title="Загрузка по прямой ссылке" open={!!editing} onCancel={() => setEditing(null)} onOk={() => form.submit()}
-      okText="Запустить" confirmLoading={action.isPending}>
-      <Failure error={action.error} />
-      <Form form={form} layout="vertical" onFinish={body => action.mutate({ path: `/downloads/${editing?.id}/retry`, body }, { onSuccess: () => setEditing(null) })}>
+      okText="Запустить" confirmLoading={starting}>
+      <Failure error={startError || action.error} />
+      <Form form={form} layout="vertical" onFinish={body => { if (editing) void runStart(`/downloads/${editing.id}/retry`, body, editing.file_type === 'mp3' ? 'mp3' : 'image', false); }}>
         <Form.Item name="source_type" label="Тип источника" rules={[{ required: true }]}><Select options={(editing?.file_type === 'mp3' ? ['mp3', 'youtube'] : ['image']).map(value => ({ value, label: value }))} /></Form.Item>
         <Form.Item name="source_uri" label="Ссылка на файл или видео" rules={[{ required: true }, { type: 'url', message: 'Введите полный URL' }]}><Input /></Form.Item>
       </Form>
     </Modal>
   </>;
+}
+
+const downloadProgressKey = 'music-quiz-download-progress';
+
+function readDownloadProgress(): Record<string, number> {
+  try {
+    const saved: unknown = JSON.parse(localStorage.getItem(downloadProgressKey) || '{}');
+    if (!saved || typeof saved !== 'object' || Array.isArray(saved)) return {};
+    return Object.fromEntries(Object.entries(saved).filter(([key, value]) =>
+      ['mp3', 'image'].includes(key) && typeof value === 'number' && Number.isSafeInteger(value) && value > 0));
+  } catch (error) {
+    console.warn('Не удалось прочитать прогресс загрузок', error);
+    return {};
+  }
+}
+
+function DownloadProgress({ kind, active, total }: { kind: string; active?: number; total?: number }) {
+  if (!active) return null;
+  const known = total !== undefined && total >= active;
+  const completed = known ? total - active : 0;
+  return <section className="downloads-progress panel" aria-label="Прогресс загрузок" role="status">
+    <div className="downloads-progress-icon"><CloudDownloadOutlined /></div>
+    <div className="downloads-progress-body">
+      <div className="downloads-progress-heading">
+        <div><strong>Загружаем {kind === 'mp3' ? 'музыку' : 'изображения'}</strong>
+          <span>{known ? `Обработано ${completed.toLocaleString('ru-RU')} из ${total.toLocaleString('ru-RU')}` : 'Загрузка запущена в другом сеансе'}</span></div>
+        <div className="downloads-remaining"><strong>{active.toLocaleString('ru-RU')}</strong><span>осталось</span></div>
+      </div>
+      {known && <Progress percent={Math.round(completed / total * 100)} strokeColor="#6254d9" />}
+      <span className="downloads-progress-note">Обработанные задания могут завершиться ошибкой.</span>
+    </div>
+  </section>;
 }
 
 export function Settings() {

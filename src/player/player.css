@@ -30,6 +30,7 @@
 }
 
 .mq-header nav { display: flex; align-items: center; gap: 10px; }
+.mq-account { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 160px; }
 .mq-brand {
   display: inline-flex;
   align-items: center;
@@ -409,6 +410,7 @@
   .mq-header, .mq-main, .mq-footer { width: calc(100% - 28px); }
   .mq-header { min-height: 60px; }
   .mq-header nav { gap: 4px; }
+  .mq-account { display: none; }
   .mq .mq-admin { display: none; }
   .mq-main { padding-block: 18px 38px; }
   .mq-hero { grid-template-columns: 1fr; gap: 22px; padding-block: 10px 24px; }

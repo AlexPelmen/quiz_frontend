@@ -34,6 +34,8 @@ export function AlbumGuessing() {
     queryFn: ({ signal }) => request<Cover[]>(`/album-guessing?${params}`, { signal }),
   });
 
+  const count = useQuery({ queryKey: ['album-guessing', 'count', status], queryFn: ({ signal }) => request<{ count: number }>(`/album-guessing/count?status=${status}`, { signal }) });
+
   function reshuffle() {
     setShuffle(Math.floor(Math.random() * 2 ** 32));
     setPage(0);
@@ -43,7 +45,7 @@ export function AlbumGuessing() {
     <PageTitle title="Модерация обложек" subtitle="Разрешите обложку для раунда и закройте подсказки на ней">
       <Refresh onClick={() => void query.refetch()} />
     </PageTitle>
-    <Failure error={query.error} />
+    <Failure error={query.error || count.error} />
     <div className="panel">
       <div className="toolbar">
         <Select aria-label="Статус модерации" value={status} onChange={value => { setStatus(value); setPage(0); }}
@@ -58,18 +60,15 @@ export function AlbumGuessing() {
           {shuffle !== null && <Button onClick={reshuffle}>Перемешать снова</Button>}
         </Space>
       </div>
+      <div className="table-total">Всего: {count.data?.count?.toLocaleString('ru-RU') ?? '—'}</div>
       <Table<Cover> rowKey="album_id" loading={query.isPending} dataSource={query.data?.slice(0, pageSize)}
-        pagination={false} scroll={{ x: 520 }} locale={{ emptyText: 'Нет обложек с этим статусом' }} columns={[
+        pagination={{ current: page + 1, pageSize, total: count.data?.count, showSizeChanger: false, onChange: next => setPage(next - 1) }} scroll={{ x: 520 }} locale={{ emptyText: 'Нет обложек с этим статусом' }} columns={[
           { title: 'Альбом', dataIndex: 'album_name' },
           { title: 'Исполнитель', dataIndex: 'artist_name' },
           { title: 'Решение', render: (_, row) => <Tag color={row.status === 'approved' ? 'success' : undefined}>{labels[row.status]}</Tag> },
           { title: 'Действия', render: (_, row) => <Button onClick={() => setEditing(row)}>Проверить</Button> },
         ]} />
-      <div className="pager">
-        <Button disabled={page === 0} onClick={() => setPage(page - 1)}>Назад</Button>
-        <Typography.Text>Страница {page + 1}</Typography.Text>
-        <Button disabled={(query.data?.length ?? 0) <= pageSize} onClick={() => setPage(page + 1)}>Далее</Button>
-      </div>
+
     </div>
     {editing && <CoverEditor cover={editing} close={() => setEditing(null)} />}
   </>;

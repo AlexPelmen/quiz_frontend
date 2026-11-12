@@ -57,6 +57,7 @@ export function ParsingLogs({ search }: { search?: string }) {
       description={`${latest.message} · ${lastEventAge} сек. назад`} />}
     {!!run?.error && <Alert showIcon type="error" title={run.error} />}
     <Card className="spaced" size="small">
+      <div className="table-total table-total-inset">Всего показано событий: {events.data?.length.toLocaleString('ru-RU') ?? '—'}</div>
       <Table<ParseEvent> rowKey="id" loading={!!selected && events.isPending} dataSource={events.data}
         pagination={{ pageSize: 30, showSizeChanger: false }} size="small" scroll={{ x: 660 }}
         locale={{ emptyText: 'События появятся после начала обработки. Для старых запусков журнал может быть пуст.' }}
@@ -79,13 +80,14 @@ export function AlbumCleanup() {
     queryKey: ['album-cleanup', page],
     queryFn: ({ signal }) => request<CleanupRow[]>(`/album-cleanup?limit=${pageSize + 1}&offset=${(page - 1) * pageSize}`, { signal }),
   });
+  const count = useQuery({ queryKey: ['album-cleanup', 'count'], queryFn: ({ signal }) => request<{ count: number }>('/album-cleanup/count', { signal }) });
   const rows = candidates.data?.slice(0, pageSize);
   return <>
     <PageTitle title="Очистка альбомов" subtitle="Просмотр и удаление альбомов вне подборки YouTube Music">
       <Button href="#parsing">К парсингу</Button>
       <Refresh onClick={() => { setSelected([]); void candidates.refetch(); }} />
     </PageTitle>
-    <Failure error={candidates.error} />
+    <Failure error={candidates.error || count.error} />
     <Failure error={action.error} />
     <Alert showIcon type="info" title="Подборки формируются при парсинге через YouTube Music"
       description="Здесь появятся лишние альбомы исполнителей с полной подборкой из рейтинга YouTube Music. Размер подборки зависит от числа подписчиков. Альбомы из готовых квизов защищены. При удалении альбома связанные треки остаются в каталоге." />
@@ -99,8 +101,9 @@ export function AlbumCleanup() {
           Удалить выбранные ({selected.length})
         </Button>
       </Popconfirm>
-      <Table<CleanupRow> className="spaced" rowKey="id" loading={candidates.isPending} dataSource={rows}
-        pagination={false} scroll={{ x: 480 }} locale={{ emptyText: 'Альбомов для очистки пока нет.' }}
+      <div className="table-total table-total-inset spaced">Всего: {count.data?.count?.toLocaleString('ru-RU') ?? '—'}</div>
+      <Table<CleanupRow> rowKey="id" loading={candidates.isPending} dataSource={rows}
+        pagination={{ current: page, pageSize, total: count.data?.count, showSizeChanger: false, onChange: next => { setSelected([]); setPage(next); } }} scroll={{ x: 480 }} locale={{ emptyText: 'Альбомов для очистки пока нет.' }}
         rowSelection={{ selectedRowKeys: selected, onChange: keys => setSelected(keys.map(String)),
           getCheckboxProps: row => ({ disabled: row.protected || action.isPending }) }}
         columns={[
@@ -108,12 +111,7 @@ export function AlbumCleanup() {
           { title: 'Альбом', dataIndex: 'album' },
           { title: 'Удаление', dataIndex: 'protected', render: value => value ? <Tag color="warning">В квизе</Tag> : 'Доступно' },
         ]} />
-      <Space wrap className="spaced">
-        <Button disabled={page === 1} onClick={() => { setSelected([]); setPage(page - 1); }}>Назад</Button>
-        <Typography.Text>Страница {page}</Typography.Text>
-        <Button disabled={(candidates.data?.length || 0) <= pageSize}
-          onClick={() => { setSelected([]); setPage(page + 1); }}>Далее</Button>
-      </Space>
+
     </Card>
   </>;
 }

@@ -7,6 +7,7 @@ import { date, Entity, request, guessRate, formatCount } from './api';
 import { CatalogDetail, missingFieldLabels, type CatalogResource } from './CatalogDetail';
 import { Failure, PageTitle, Refresh, Status, statusLabel, useAction } from './shared';
 import { useTags } from './Tags';
+import { AddArtistList } from './AddArtistList';
 
 const pageSize = 20;
 const names = { artists: 'Исполнители', albums: 'Альбомы', tracks: 'Треки' };
@@ -47,6 +48,11 @@ export function Catalog({ resource, search }: { resource: CatalogResource; searc
     queryKey: [resource, listParams.toString()],
     queryFn: ({ signal }) => request<Entity[]>(`/${resource}?${listParams}`, { signal }),
     refetchInterval: resource === 'tracks' ? 5000 : false,
+  });
+  const count = useQuery({
+    queryKey: [resource, 'count', (() => { const p = new URLSearchParams(params); p.delete('page'); p.delete('sort'); p.delete('order'); return p.toString(); })()],
+    queryFn: ({ signal }) => request<{ count: number }>(`/${resource}/count?${new URLSearchParams([...params].filter(([key]) => !['page', 'sort', 'order'].includes(key)))}`, { signal }),
+    refetchInterval: 5000,
   });
   const artists = useQuery({
     queryKey: ['artist-options'],
@@ -104,7 +110,8 @@ export function Catalog({ resource, search }: { resource: CatalogResource; searc
     sorter: true,
     sortOrder: params.get('sort') === key ? (params.get('order') === 'desc' ? 'descend' as const : 'ascend' as const) : null,
   });
-  const changeSort: TableProps<Entity>['onChange'] = (_pagination, _filters, result) => {
+  const changeSort: TableProps<Entity>['onChange'] = (_pagination, _filters, result, extra) => {
+    if (extra.action !== 'sort') return;
     const sorter = Array.isArray(result) ? result[0] : result;
     updateRoute({
       sort: sorter?.order ? String(sorter.columnKey) : undefined,
@@ -149,7 +156,7 @@ export function Catalog({ resource, search }: { resource: CatalogResource; searc
     <PageTitle title={names[resource]} subtitle="Музыкальный каталог и данные для подбора вопросов.">
       <Refresh onClick={() => void query.refetch()} /><Button type="primary" icon={<PlusOutlined />} onClick={() => startEdit('new')}>Добавить</Button>
     </PageTitle>
-    <Failure error={query.error || artists.error || albums.error || tags.error} />
+    <Failure error={query.error || count.error || artists.error || albums.error || tags.error} />
     <div className="panel">
       <div className="toolbar catalog-filters">
         {resource === 'artists' ? <>
@@ -166,15 +173,13 @@ export function Catalog({ resource, search }: { resource: CatalogResource; searc
             value, label: value === 'finished' ? 'Есть запись' : statusLabel(value),
           }))} onChange={value => updateRoute({ audio_status: value })} />
         </>}
+        {resource === 'artists' && <AddArtistList />}
       </div>
+      <div className="table-total">Всего: {count.data ? formatCount(count.data.count) : '—'}</div>
       <Table<Entity> rowKey="id" loading={query.isPending} dataSource={query.data?.slice(0, pageSize)} columns={columns}
-        onChange={changeSort} scroll={{ x: resource === 'tracks' ? 1170 : 1010 }} pagination={false}
+        onChange={changeSort} scroll={{ x: resource === 'tracks' ? 1170 : 1010 }} pagination={{ current: page, pageSize, total: count.data?.count, showSizeChanger: false, onChange: next => updateRoute({ page: next === 1 ? undefined : String(next) }) }}
         locale={{ emptyText: 'Записи не найдены' }} />
-      <div className="pager">
-        <Button disabled={page === 1} onClick={() => updateRoute({ page: page === 2 ? undefined : String(page - 1) })}>Назад</Button>
-        <Typography.Text>Страница {page}</Typography.Text>
-        <Button disabled={(query.data?.length || 0) <= pageSize} onClick={() => updateRoute({ page: String(page + 1) })}>Далее</Button>
-      </div>
+
     </div>
     {detailID && <CatalogDetail resource={resource} id={detailID} onClose={() => setDetailID(undefined)} onEdit={startEdit} />}
     <Modal title={editing === 'new' ? 'Новая запись' : `Редактирование · ${editing?.name || ''}`}

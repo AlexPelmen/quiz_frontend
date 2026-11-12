@@ -79,7 +79,7 @@ function QuizImage({ src }: { src: string }) {
 }
 
 export function QuizPlayer() {
-  const { can } = useAuth();
+  const { user, can, logout, logoutError, logoutPending } = useAuth();
   const [sound, setSound] = useState<boolean | null>(null);
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<string | null>(null);
@@ -225,6 +225,8 @@ export function QuizPlayer() {
         <span className="mq-brand-icon" aria-hidden="true">♫</span><span>MUSIC<span className="mq-brand-accent">QUIZ</span></span>
       </button>
       <nav aria-label="Навигация">
+        <span className="mq-account">{user.name}</span>
+        <Button type="text" onClick={logout} loading={logoutPending}>Выйти</Button>
         <Button type="text" href={can('packs') ? '/#packs' : '/#profile'} className="mq-admin">{can('packs') ? 'Студия пакетов' : 'Мой профиль'}</Button>
         <Button className="mq-sound-button" aria-pressed={sound === true} disabled={sound === null}
           icon={sound ? <SoundOutlined /> : <MutedOutlined />} onClick={() => changeSound(!sound)}>
@@ -234,6 +236,7 @@ export function QuizPlayer() {
     </header>
 
     <main className="mq-main">
+      {logoutError && <Alert showIcon type="error" title={logoutError.message} />}
       {audio.error && !question && <Alert type="warning" showIcon title={audio.error} />}
       <div key={screen} className="mq-screen">
         {!selected && <>

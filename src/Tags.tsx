@@ -26,7 +26,7 @@ export function Tags() {
       <Refresh onClick={() => void query.refetch()} /><Button type="primary" icon={<PlusOutlined />} onClick={() => edit('new')}>Добавить тег</Button>
     </PageTitle>
     <Failure error={query.error} /><Failure error={action.error} />
-    <div className="panel"><Table<TagOption> rowKey="id" loading={query.isPending} dataSource={query.data} columns={[
+    <div className="panel"><div className="table-total">Всего: {query.data?.length.toLocaleString('ru-RU') ?? '—'}</div><Table<TagOption> rowKey="id" loading={query.isPending} dataSource={query.data} columns={[
       { title: 'Название', dataIndex: 'name' },
       { title: 'Действия', width: 130, render: (_, tag) => <Space>
         <Button aria-label="Изменить тег" icon={<EditOutlined />} onClick={() => edit(tag)} />

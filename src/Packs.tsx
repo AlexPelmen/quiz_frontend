@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Button, Card, Checkbox, Collapse, Drawer, Form, Input, Modal, Popconfirm, Select, Space, Table, Typography, Upload } from 'antd';
+import { Button, Card, Checkbox, Collapse, Drawer, Form, Input, InputNumber, Modal, Popconfirm, Select, Space, Table, Typography, Upload } from 'antd';
 import type { UploadFile } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
 import { useQuery } from '@tanstack/react-query';
@@ -18,27 +18,28 @@ export function Packs() {
   const tags = useTags();
   const tagOptions = tags.data?.map(tag => ({ value: tag.name, label: tag.name }));
   const query = useQuery({ queryKey: ['quiz-packs', page], queryFn: () => request<Entity[]>(`/quiz-packs?limit=20&offset=${(page - 1) * 20}`) });
+  const count = useQuery({ queryKey: ['quiz-packs', 'count'], queryFn: ({ signal }) => request<{ count: number }>('/quiz-packs/count', { signal }) });
   const detail = useQuery({ queryKey: ['quiz-pack', selected], queryFn: () => request<QuizPack>(`/quiz-packs/${selected}`), enabled: !!selected });
   const edit = (pack: Entity | 'new') => {
     action.reset();
     setCoverFiles([]);
     form.resetFields();
-    form.setFieldsValue(pack === 'new' ? { tags: [], difficulty: 'medium', round_types: ['artist_by_track'] } : pack);
+    form.setFieldsValue(pack === 'new' ? { tags: [], difficulty: 'medium', question_count: 100, round_types: ['artist_by_track'] } : pack);
     setEditing(pack);
   };
-  return <><PageTitle title="Квиз-пакеты" subtitle="До 10 раундов по 10 вопросов · без повторов исполнителей"><Refresh onClick={() => void query.refetch()} /><Button type="primary" icon={<PlusOutlined />} onClick={() => edit('new')}>Создать пакет</Button></PageTitle>
-    <Failure error={query.error || tags.error} /><div className="panel"><Table<Entity> rowKey="id" loading={query.isFetching} dataSource={query.data} pagination={false} columns={[
+  return <><PageTitle title="Квиз-пакеты" subtitle="От 10 до 100 вопросов · без повторов исполнителей"><Refresh onClick={() => void query.refetch()} /><Button type="primary" icon={<PlusOutlined />} onClick={() => edit('new')}>Создать пакет</Button></PageTitle>
+    <Failure error={query.error || count.error || tags.error} /><div className="panel"><div className="table-total">Всего: {count.data?.count?.toLocaleString('ru-RU') ?? '—'}</div><Table<Entity> rowKey="id" loading={query.isFetching} dataSource={query.data} pagination={{ current: page, pageSize: 20, total: count.data?.count, showSizeChanger: false, onChange: setPage }} columns={[
       { title: 'Пакет', dataIndex: 'name', render: (name, row) => <Button type="link" onClick={() => setSelected(row.id)}>{name}</Button> },
       { title: 'Описание', dataIndex: 'description' }, { title: 'Создан', dataIndex: 'created_at', render: date },
       { title: 'Действия', render: (_, row) => <Space><Button onClick={() => edit(row)}>Изменить</Button><Popconfirm title="Удалить пакет?" onConfirm={() => action.mutateAsync({ path: `/quiz-packs/${row.id}`, method: 'DELETE' })}><Button danger>Удалить</Button></Popconfirm></Space> },
-    ]} /><div className="pager"><Button disabled={page === 1} onClick={() => setPage(page - 1)}>Назад</Button>Страница {page}<Button disabled={(query.data?.length || 0) < 20} onClick={() => setPage(page + 1)}>Далее</Button></div></div>
+    ]} /></div>
     <Modal open={!!editing} title={editing === 'new' ? 'Составить квиз-пакет' : 'Описание пакета'} onCancel={() => setEditing(null)} onOk={() => form.submit()} confirmLoading={action.isPending}>
       <Failure error={action.error} />
       <Form form={form} layout="vertical" onFinish={values => {
-        const { name, description, tags, artist_tag, difficulty, round_types } = values;
+        const { name, description, tags, artist_tag, difficulty, round_types, question_count } = values;
         let body: unknown = { name, description, tags };
         if (editing === 'new') {
-          const pack = { name, description, tags, artist_tag, difficulty, round_types };
+          const pack = { name, description, tags, artist_tag, difficulty, round_types, question_count };
           const cover = coverFiles[0]?.originFileObj;
           if (cover) {
             const data = new FormData();
@@ -64,6 +65,10 @@ export function Packs() {
           <Form.Item name="difficulty" label="Сложность" rules={[{ required: true }]}>
             <Select options={Object.entries(difficultyLabels).map(([value, label]) => ({ value, label }))} />
           </Form.Item>
+          <Form.Item name="question_count" label="Количество вопросов" extra="Каждый раунд содержит 10 вопросов."
+            rules={[{ required: true, type: 'integer', min: 10, max: 100 }, { validator: (_, value: number) => value % 10 === 0 ? Promise.resolve() : Promise.reject(new Error('Укажите число, кратное 10')) }]}>
+            <InputNumber min={10} max={100} step={10} precision={0} />
+          </Form.Item>
           <Form.Item name="round_types" label="Типы раундов" rules={[{ type: 'array', required: true, min: 1, message: 'Выберите хотя бы один раунд' }]}>
             <Checkbox.Group>
               <Space orientation="vertical">
@@ -71,7 +76,7 @@ export function Packs() {
               </Space>
             </Checkbox.Group>
           </Form.Item>
-          <Typography.Text type="secondary">Для каждого выбранного раунда нужно 10 подходящих исполнителей. Исполнители в пакете не повторяются.</Typography.Text>
+          <Typography.Text type="secondary">Типы раундов выбираются случайно и при необходимости повторяются. Для каждого вопроса нужен свой подходящий исполнитель.</Typography.Text>
         </>}
       </Form>
     </Modal>

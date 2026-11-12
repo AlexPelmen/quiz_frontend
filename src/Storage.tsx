@@ -67,6 +67,7 @@ export function Storage() {
       </div>
       </div>
       {!!failed.length && <Alert type="warning" showIcon title="Не удалось обработать некоторые файлы" description={failed.map(item => <div key={item.path}>{item.path}: {item.error}</div>)} />}
+      <div className="table-total">Всего: {report.data?.orphans.length.toLocaleString('ru-RU') ?? '—'}</div>
       <Table<StorageFile> rowKey="path" dataSource={report.data?.orphans} loading={report.isFetching || action.isPending} scroll={{ x: 800 }}
         rowSelection={{
           columnTitle: <Checkbox aria-label="Выбрать все найденные файлы" checked={allPaths.length > 0 && selectedCount === allPaths.length}

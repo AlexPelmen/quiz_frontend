@@ -5,7 +5,7 @@ import { ApiError, request, save } from './api';
 import { Failure, PageTitle } from './shared';
 
 export type Account = { id: string; name: string; login: string; role: 'admin' | 'moderator' | 'player'; permissions: string[]; created_at: string; updated_at: string };
-type Context = { user: Account; can: (section: string) => boolean; logout: () => void };
+type Context = { user: Account; can: (section: string) => boolean; logout: () => void; logoutError: Error | null; logoutPending: boolean };
 const AuthContext = createContext<Context | null>(null);
 export function useAuth() { const value = useContext(AuthContext); if (!value) throw new Error('Нет данных пользователя'); return value; }
 
@@ -35,7 +35,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
   const user = me.data;
   const can = (section: string) => user.role === 'admin' || section === 'profile' || section === 'player'
     || user.role === 'moderator' && section === 'album-guessing' || user.permissions.includes(section);
-  return <AuthContext.Provider value={{ user, can, logout: () => logout.mutate() }}>{children}</AuthContext.Provider>;
+  return <AuthContext.Provider value={{ user, can, logout: () => logout.mutate(), logoutError: logout.error, logoutPending: logout.isPending }}>{children}</AuthContext.Provider>;
 }
 
 const permissions = [
@@ -68,7 +68,7 @@ export function Users() {
     onSuccess: () => { setEditing(null); void client.invalidateQueries({ queryKey: ['users'] }); } });
   const open = (row: Account | 'new') => { form.resetFields(); form.setFieldsValue(row === 'new' ? { role:'player', permissions:[] } : { ...row, password:'' }); setEditing(row); };
   return <><PageTitle title="Пользователи" subtitle="Учётные записи и доступ к разделам"><Button type="primary" onClick={() => open('new')}>Добавить</Button></PageTitle>
-    <Failure error={list.error || action.error} /><div className="panel"><Table<Account> rowKey="id" dataSource={list.data} loading={list.isPending} scroll={{ x: 780 }} columns={[
+    <Failure error={list.error || action.error} /><div className="panel"><div className="table-total">Всего: {list.data?.length.toLocaleString('ru-RU') ?? '—'}</div><Table<Account> rowKey="id" dataSource={list.data} loading={list.isPending} scroll={{ x: 780 }} columns={[
       { title:'Имя',dataIndex:'name' }, { title:'Логин',dataIndex:'login' }, { title:'Роль',dataIndex:'role' },
       { title:'Права',render: (_,row) => row.role === 'admin' ? 'Все разделы' : row.permissions.join(', ') || 'По роли' },
       { title:'Действия',render: (_,row) => <Space wrap><Button onClick={() => open(row)}>Изменить</Button>

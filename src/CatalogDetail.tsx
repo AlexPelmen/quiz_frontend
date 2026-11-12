@@ -157,7 +157,7 @@ function AlbumTrackList({ value, complete }: { value: unknown; complete: unknown
     <Typography.Paragraph type="secondary">
       {complete ? 'Полный список из источника.' : 'Список из источника может быть неполным.'}
     </Typography.Paragraph>
-    {valid ? <Table
+    {valid ? <><div className="table-total table-total-inset">Всего: {records.length.toLocaleString('ru-RU')}</div><Table
       size="small"
       pagination={false}
       rowKey="key"
@@ -167,7 +167,7 @@ function AlbumTrackList({ value, complete }: { value: unknown; complete: unknown
         { title: 'Название', dataIndex: 'title' },
       ]}
       locale={{ emptyText: 'Треклист пуст' }}
-    /> : <>
+    /></> : <>
       <Alert type="warning" showIcon title="Не удалось прочитать треклист CSV" />
       <details><summary>Исходные данные</summary><pre>{value}</pre></details>
     </>}

@@ -1,0 +1,35 @@
+.downloads-progress { display: flex; gap: 18px; align-items: flex-start; padding: 22px 24px; margin-bottom: 20px; background: linear-gradient(115deg, #f7f6ff, #fff 70%); border-color: #e4e0fa; }
+.downloads-progress-icon { display: grid; place-items: center; flex: 0 0 44px; height: 44px; color: #6254d9; background: #eeebff; border-radius: 12px; font-size: 21px; }
+.downloads-progress-body { flex: 1; min-width: 0; }
+.downloads-progress-heading, .downloads-controls-heading, .downloads-table-heading { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
+.downloads-progress-heading > div:first-child, .downloads-controls-heading > div:first-child, .downloads-table-title { display: flex; flex-direction: column; gap: 4px; }
+.downloads-progress-heading strong, .downloads-controls-heading strong, .downloads-table-title strong { color: #252a3c; font-size: 15px; }
+.downloads-progress-heading span, .downloads-controls-heading span, .downloads-table-title span, .downloads-progress-note { color: #7b8397; font-size: 13px; }
+.downloads-remaining { display: flex; align-items: baseline; gap: 6px; white-space: nowrap; }
+.downloads-remaining strong { color: #6254d9; font-size: 22px; line-height: 1; }
+.downloads-progress .ant-progress { margin: 12px 0 4px; }
+.downloads-notice { margin-bottom: 16px; }
+.downloads-tabs .ant-tabs-nav { margin: 0; padding: 0 24px; }
+.downloads-controls { display: grid; gap: 15px; padding: 22px 24px; border-bottom: 1px solid #edf0f5; }
+.downloads-selection { color: #646d82; font-size: 13px; }
+.downloads-selection .ant-btn { padding-right: 0; }
+.downloads-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.downloads-actions .ant-btn { min-height: 34px; }
+.downloads-table-heading { padding: 20px 24px; }
+.downloads-table-heading .ant-select { width: 210px; max-width: 100%; }
+.downloads-panel .ant-table-pagination { padding: 0 24px; }
+.downloads-panel .ant-table-cell .muted { margin: 3px 0; }
+.downloads-panel .ant-table-cell .ant-tag { margin-top: 4px; }
+.downloads-panel .ant-table-cell { vertical-align: middle; }
+@media (max-width: 600px) {
+  .downloads-progress { padding: 16px; gap: 12px; }
+  .downloads-progress-icon { flex-basis: 36px; height: 36px; font-size: 18px; }
+  .downloads-progress-heading { align-items: flex-start; }
+  .downloads-remaining { flex-direction: column; gap: 2px; align-items: flex-end; }
+  .downloads-tabs .ant-tabs-nav { padding: 0 16px; }
+  .downloads-controls, .downloads-table-heading { padding: 16px; }
+  .downloads-controls-heading, .downloads-table-heading { align-items: flex-start; flex-direction: column; }
+  .downloads-selection .ant-btn { padding-left: 8px; }
+  .downloads-table-heading .ant-select { width: 100%; }
+  .downloads-panel .ant-table-pagination { padding: 0 12px; }
+}
