@@ -67,10 +67,9 @@ export function questionName(value: string) {
 }
 
 export function questionHint(text: string, roundType: string, answer?: string) {
-  if (roundType === 'artist_cities' || roundType === 'artist_alphabet') return '';
+  if (roundType === 'artist_cities' || roundType === 'artist_alphabet' || roundType === 'artist_growth') return '';
   // В ранее созданных пакетах начальные A и An ошибочно пропускались.
   if (roundType === 'artist_initial' && /^a(?:n)?\s+\S/iu.test(questionName(answer || ''))) return 'A/А';
-  if (roundType === 'artist_growth' && answer) return `Букв в названии: ${(questionName(answer).match(/\p{L}/gu) || []).length}`;
   // В сохранённых пакетах согласные могли быть записаны как подчёркивания.
   text = questionName(text);
   return roundType === 'track_vowels' ? text.replaceAll('_', '').replace(/\s+/g, ' ').trim().toLowerCase() : text;
@@ -121,7 +120,7 @@ const roundRules: Record<string, { name: string; instructions: string; label: st
   },
   artist_growth: {
     name: 'На вырост',
-    instructions: 'Угадайте исполнителей по трекам. В каждом следующем названии больше букв. Пробелы, цифры и знаки не считаются.',
+    instructions: 'Угадайте исполнителей по трекам. В каждом следующем названии больше букв. Начальный артикль The, пробелы, цифры и знаки не считаются.',
     label: 'На вырост',
     symbol: '↗',
   },
