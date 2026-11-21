@@ -1,20 +1,23 @@
 import { useState } from 'react';
-import { Alert, App, Button, Input, Modal, Progress, Typography } from 'antd';
+import { Alert, App, Button, Input, Modal, Progress, Select, Typography } from 'antd';
 import { useQueryClient } from '@tanstack/react-query';
 import { save } from './api';
 import { parseArtistList, type ArtistListError } from './artistList';
+import { useTags } from './Tags';
 
 export function AddArtistList() {
   const [open, setOpen] = useState(false);
   const [value, setValue] = useState('');
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [errors, setErrors] = useState<ArtistListError[]>([]);
   const [created, setCreated] = useState(0);
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
   const [running, setRunning] = useState(false);
   const { message } = App.useApp();
   const client = useQueryClient();
+  const tags = useTags();
 
-  const close = () => { setOpen(false); setValue(''); setErrors([]); setCreated(0); setProgress(null); };
+  const close = () => { setOpen(false); setValue(''); setSelectedTags([]); setErrors([]); setCreated(0); setProgress(null); };
   const submit = async () => {
     if (running) return;
     const parsed = parseArtistList(value);
@@ -27,7 +30,7 @@ export function AddArtistList() {
     let added = 0;
     for (const [index, entry] of parsed.entries.entries()) {
       try {
-        await save('/artists', 'POST', entry.body);
+        await save('/artists', 'POST', { ...entry.body, tags: selectedTags });
         added++;
       } catch (error) {
         failures.push({ input: entry.original, message: error instanceof Error ? error.message : 'Не удалось создать запись.' });
@@ -63,6 +66,14 @@ export function AddArtistList() {
         <li key={`${item.input}-${i}`}>{item.input && <strong>{item.input}: </strong>}{item.message}</li>)}</ul>} style={{ marginBottom: 12 }} />}
       <Input.TextArea aria-label="Имена или ссылки исполнителей" value={value} disabled={running} autoSize={{ minRows: 7, maxRows: 15 }}
         placeholder={'Vampire Weekend\nThe Fray\nhttps://www.youtube.com/@artist'} onChange={event => setValue(event.target.value)} />
+      <div style={{ marginTop: 16 }}>
+        <Typography.Text>Теги для всех исполнителей</Typography.Text>
+        <Select aria-label="Теги для всех исполнителей" mode="multiple" showSearch={{ optionFilterProp: 'label' }}
+          placeholder="Выберите теги" value={selectedTags} onChange={setSelectedTags} style={{ width: '100%', marginTop: 4 }}
+          options={tags.data?.map(tag => ({ value: tag.name, label: tag.name }))} loading={tags.isPending}
+          disabled={running || tags.isError} />
+        {tags.isError && <Alert type="error" showIcon title="Не удалось загрузить теги" description={<Button type="link" onClick={() => void tags.refetch()}>Повторить</Button>} />}
+      </div>
       {progress && <Progress aria-label="Добавление исполнителей" percent={Math.round(progress.done / progress.total * 100)}
         format={() => `${progress.done} / ${progress.total}`} />}
     </Modal>

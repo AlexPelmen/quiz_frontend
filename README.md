@@ -17,6 +17,8 @@ npm run dev
 
 ## Docker
 
+Пуш в `master` запускает проверку и деплой фронтенда на [стенд Music Quiz](https://2.27.10.161).
+
 ```powershell
 docker compose up -d --build
 ```

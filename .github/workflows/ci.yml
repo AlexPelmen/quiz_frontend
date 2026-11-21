@@ -1,0 +1,26 @@
+name: Frontend CI
+
+on:
+  push:
+    branches: [master]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-master
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - name: Build and lint
+        run: |
+          docker build --target build --tag music-quiz-frontend-check .
+          docker run --rm music-quiz-frontend-check npm run lint
+          docker build .
