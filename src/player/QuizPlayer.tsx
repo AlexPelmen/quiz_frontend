@@ -228,7 +228,7 @@ export function QuizPlayer() {
       <nav aria-label="Навигация">
         <span className="mq-account">{user.name}</span>
         <Button type="text" onClick={logout} loading={logoutPending}>Выйти</Button>
-        <Button type="text" href={can('packs') ? '/#packs' : '/#profile'} className="mq-admin">{can('packs') ? 'Студия пакетов' : 'Мой профиль'}</Button>
+        <Button type="text" href={can('packs') ? '/admin#packs' : '/admin#profile'} className="mq-admin">{can('packs') ? 'Студия пакетов' : 'Мой профиль'}</Button>
         <Button className="mq-sound-button" aria-pressed={sound === true} disabled={sound === null}
           icon={sound ? <SoundOutlined /> : <MutedOutlined />} onClick={() => changeSound(!sound)}>
           Звук <span className="mq-sound-state">{sound ? 'вкл.' : 'выкл.'}</span>
@@ -259,7 +259,7 @@ export function QuizPlayer() {
             {loadError && <Alert type="error" showIcon title="Не удалось загрузить список пакетов" description={loadError.message} />}
             {packs.isSuccess && !packs.data?.length && <Empty className="mq-empty"
               description={page === 1 ? 'Пакетов пока нет. Создайте первый в студии.' : 'На этой странице пакетов нет.'}>
-              {page === 1 && can('packs') && <Button href="/#packs">Открыть студию пакетов</Button>}
+              {page === 1 && can('packs') && <Button href="/admin#packs">Открыть студию пакетов</Button>}
             </Empty>}
             <div className="mq-pack-grid">{packs.data?.map((item, index) => <Card className="mq-pack-card" key={item.id}
               cover={item.cover_download_id ? <img className="mq-pack-cover" src={fileURL(item.cover_download_id)} alt="" />

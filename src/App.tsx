@@ -53,7 +53,7 @@ export function App() {
       <div className="sidebar-footer">Личная музыкальная библиотека</div>
     </Layout.Sider>
     <Layout><Layout.Header className="topbar"><span>Рабочее пространство <span className="muted">/ Управление</span></span><Space wrap>
-      <Button href="/play" icon={<PlayCircleOutlined />}>Играть</Button>
+      <Button href="/" icon={<PlayCircleOutlined />}>Играть</Button>
       {can('parsing') && <><Tooltip title={quota.data ? `Последний ответ: ${date(quota.data.observed_at)}. Примерное обновление лимита: ${date(quota.data.reset_at)}` : 'Данные появятся после запроса к Genius'}>
         <Tag color={quota.data && quota.data.remaining === 0 ? 'warning' : 'purple'}>Genius: {quota.data ? `${quota.data.remaining.toLocaleString('ru-RU')} / ${quota.data.limit.toLocaleString('ru-RU')}` : 'нет данных'}</Tag>
       </Tooltip><Button size="small" icon={<ReloadOutlined />} aria-label="Проверить лимит Genius" loading={action.isPending} onClick={() => action.mutate({ path: '/genius-quota/refresh' })} /></>}

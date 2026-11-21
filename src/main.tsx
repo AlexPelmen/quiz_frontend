@@ -10,17 +10,17 @@ import 'antd/dist/reset.css';
 import './style.css';
 
 const client = new QueryClient({ defaultOptions: { queries: { retry: 1, staleTime: 1500 } } });
-const isPlayer = /^\/play\/?$/.test(location.pathname);
-if (isPlayer) document.title = 'Music Quiz — Играть';
+const isAdmin = /^\/admin\/?$/.test(location.pathname);
+document.title = isAdmin ? 'Music Quiz — управление' : 'Music Quiz — Играть';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode><QueryClientProvider client={client}>
-    <ConfigProvider locale={ruRU} theme={isPlayer ? {
+    <ConfigProvider locale={ruRU} theme={!isAdmin ? {
       algorithm: theme.darkAlgorithm,
       token: { colorPrimary: '#d9ff66', colorBgBase: '#13101b', colorTextLightSolid: '#16121c', borderRadius: 12, fontFamily: 'Inter, Segoe UI, sans-serif' },
       components: { Button: { primaryColor: '#16121c' }, Modal: { contentBg: '#21192c', headerBg: '#21192c' } },
     } : { token: { colorPrimary: '#6254d9', borderRadius: 10, fontFamily: 'Inter, Segoe UI, sans-serif' } }}>
-      <AntApp><AuthGate>{isPlayer ? <QuizPlayer /> : <App />}</AuthGate></AntApp>
+      <AntApp><AuthGate>{isAdmin ? <App /> : <QuizPlayer />}</AuthGate></AntApp>
     </ConfigProvider>
   </QueryClientProvider></React.StrictMode>,
 );
