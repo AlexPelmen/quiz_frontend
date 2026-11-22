@@ -1,9 +1,15 @@
+export type QuizStatus = 'new' | 'pending' | 'ready';
+
 export interface QuizPackSummary {
   id: string;
   name: string;
   description: string;
   tags: string[] | null;
   created_at: string;
+  status: QuizStatus;
+  clips_total: number;
+  clips_ready: number;
+  clip_error?: string;
   difficulty?: string;
   cover_download_id?: string | null;
 }
@@ -22,6 +28,7 @@ export interface QuizRound {
 export interface QuizQuestion {
   id: string;
   number: number;
+  status: QuizStatus;
   artist_id: string;
   track_id: string | null;
   primary_text: string;

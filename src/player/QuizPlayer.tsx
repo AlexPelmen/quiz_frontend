@@ -105,12 +105,12 @@ export function QuizPlayer() {
 
   const packs = useQuery({
     queryKey: ['quiz-packs', 'player', page],
-    queryFn: () => request<QuizPackSummary[]>(`/quiz-packs?limit=${pageSize}&offset=${(page - 1) * pageSize}`),
+    queryFn: () => request<QuizPackSummary[]>(`/quiz-packs?status=ready&limit=${pageSize}&offset=${(page - 1) * pageSize}`),
     enabled: selected === null,
   });
   const detail = useQuery({
-    queryKey: ['quiz-pack', selected],
-    queryFn: () => request<QuizPack>(`/quiz-packs/${encodeURIComponent(selected ?? '')}`),
+    queryKey: ['quiz-pack', 'player', selected],
+    queryFn: () => request<QuizPack>(`/quiz-packs/${encodeURIComponent(selected ?? '')}?status=ready`),
     enabled: selected !== null && game === null,
   });
   const pack = game?.pack ?? detail.data;
