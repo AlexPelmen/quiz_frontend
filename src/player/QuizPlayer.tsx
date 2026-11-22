@@ -8,11 +8,12 @@ import {
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { fileURL, request, save } from '../api';
 import { useAuth } from '../Auth';
-import { difficultyLabels, questionAudioURL, questionCoverURL, questionHint, quizScore, ruleFor } from '../quiz';
+import { difficultyLabels, questionHint, quizScore, ruleFor } from '../quiz';
 import type { QuizPack, QuizPackSummary, QuizQuestion, QuizRound, RoundResult } from '../quiz';
 import { QuizAnswer } from './QuizAnswer';
 import { QuestionFeedback } from './QuestionFeedback';
 import { useQuizAudio } from './useQuizAudio';
+import { useQuizMedia, type QuestionMedia } from './useQuizMedia';
 import './player.css';
 
 const pageSize = 12;
@@ -38,6 +39,7 @@ function gameSteps(rounds: QuizRound[]): Step[] {
 
 type Game = {
   pack: QuizPack;
+  media: ReadonlyMap<string, QuestionMedia>;
   steps: Step[];
   index: number;
   attemptId: string;
@@ -112,6 +114,7 @@ export function QuizPlayer() {
     enabled: selected !== null && game === null,
   });
   const pack = game?.pack ?? detail.data;
+  const { state: packMedia, retry: retryMedia } = useQuizMedia(pack);
   const rounds = (pack?.rounds ?? []).filter(round => round.questions.length > 0);
   const total = rounds.reduce((sum, round) => sum + round.questions.length, 0);
   const step = game?.steps[game.index];
@@ -124,7 +127,9 @@ export function QuizPlayer() {
   const marked = question ? game?.answers[question.id] : undefined;
   const result = step?.kind === 'result' ? game?.results[step.round.id] : undefined;
   const resultSaved = step?.kind === 'result' && game?.saved.has(step.round.id);
-  const clip = pack && question?.sound_download_id ? questionAudioURL(pack.id, question.number) : null;
+  const questionMedia = question && game?.media.get(question.id);
+  const clip = questionMedia?.audio ?? null;
+  const completedFiles = packMedia.status === 'ready' ? packMedia.total : packMedia.status === 'loading' ? packMedia.loaded : 0;
   const screen = game ? `${game.pack.id}-${game.index}` : selected ? `pack-${selected}-${!!pack}` : 'catalog';
 
   useEffect(() => {
@@ -140,8 +145,7 @@ export function QuizPlayer() {
     const index = game.index + offset;
     const next = game.steps[index];
     if (!next) return;
-    const url = next.kind === 'question' && next.question.sound_download_id
-      ? questionAudioURL(game.pack.id, next.question.number) : null;
+    const url = next.kind === 'question' ? game.media.get(next.question.id)?.audio ?? null : null;
     if (next.kind === 'result' && !game.results[next.round.id]) {
       const answers: Record<string, boolean> = {};
       for (const q of next.round.questions) {
@@ -305,9 +309,20 @@ export function QuizPlayer() {
             {rounds.length > 0 ? <ol className="mq-round-list" aria-label="Раунды пакета">
               {rounds.map(round => <li key={round.id}><span>{numberLabel(round.number)}</span>{ruleFor(round.type).name}</li>)}
             </ol> : <Alert showIcon type="info" title="В этом пакете нет вопросов." />}
-            <Button size="large" type="primary" icon={<PlayCircleOutlined />} disabled={!total}
-              onClick={() => setGame({ pack, steps: gameSteps(rounds), index: 0, attemptId: crypto.randomUUID(),
-                revealed: new Set(), answers: {}, results: {}, saved: new Set() })}>Начать</Button>
+            {total > 0 && packMedia.status === 'preparing' && <div role="status">Подготавливаем список файлов…</div>}
+            {(packMedia.status === 'loading' || packMedia.status === 'ready') && packMedia.total > 0 && <div className="mq-media-progress">
+              <div>Загружено {completedFiles} из {packMedia.total} файлов</div>
+              <Progress aria-label="Загрузка файлов квиза" aria-valuetext={`${completedFiles} из ${packMedia.total} файлов`}
+                percent={Math.floor(completedFiles / packMedia.total * 100)} />
+            </div>}
+            {packMedia.status === 'error' && <Alert type="error" showIcon title="Не удалось подготовить пакет"
+              description={packMedia.message} action={<Button onClick={retryMedia}>Повторить</Button>} />}
+            <Button size="large" type="primary" icon={<PlayCircleOutlined />} disabled={!total || packMedia.status !== 'ready'}
+              onClick={() => {
+                if (packMedia.status !== 'ready') return;
+                setGame({ pack, media: packMedia.questions, steps: gameSteps(rounds), index: 0, attemptId: crypto.randomUUID(),
+                  revealed: new Set(), answers: {}, results: {}, saved: new Set() });
+              }}>Начать</Button>
           </section>}
         </>}
 
@@ -336,11 +351,9 @@ export function QuizPlayer() {
             <Progress aria-label="Прогресс раунда" percent={step.position / step.round.questions.length * 100} showInfo={false} strokeColor="#b294ff" />
             <h1 ref={heading} tabIndex={-1}>{step.question.primary_text}</h1>
             <p>{rule?.instructions}</p>
-            {revealed ? <><Splash answer /><QuizAnswer question={step.question} roundType={step.round.type} /></> : <>
+            {revealed ? <><Splash answer /><QuizAnswer question={step.question} roundType={step.round.type} media={questionMedia?.answer} /></> : <>
               {hint && <div className="mq-hint">{hint}</div>}
-              {step.round.type === 'artist_by_cover'
-                ? <QuizImage key={step.question.id} src={questionCoverURL(game.pack.id, step.question.number)} />
-                : step.question.image_download_id && <QuizImage key={step.question.id} src={fileURL(step.question.image_download_id)} />}
+              {questionMedia?.image && <QuizImage key={step.question.id} src={questionMedia.image} />}
             </>}
             {clip && <>
               <div className="mq-audio">

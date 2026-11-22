@@ -23,21 +23,30 @@ export class ApiError extends Error {
   constructor(message: string, public readonly status: number) { super(message); }
 }
 
+async function apiResponse(url: string, options: RequestInit) {
+  const response = await fetch(url, options);
+  if (!response.ok) {
+    if (response.status === 401 && url !== '/api/v1/auth/me' && url !== '/api/v1/auth/login') window.dispatchEvent(new Event('quiz:unauthorized'));
+    const body = await response.json().catch(() => null);
+    throw new ApiError(body?.error || `Ошибка HTTP ${response.status}`, response.status);
+  }
+  return response;
+}
+
 export async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const headers = new Headers(options.headers);
   if (!headers.has('Content-Type') && !(options.body instanceof FormData)) {
     headers.set('Content-Type', 'application/json');
   }
-  const response = await fetch(`/api/v1${path}`, {
-    ...options,
-    headers,
-  });
-  if (!response.ok) {
-    if (response.status === 401 && path !== '/auth/me' && path !== '/auth/login') window.dispatchEvent(new Event('quiz:unauthorized'));
-    const body = await response.json().catch(() => null);
-    throw new ApiError(body?.error || `Ошибка HTTP ${response.status}`, response.status);
-  }
+  const response = await apiResponse(`/api/v1${path}`, { ...options, headers });
   return response.status === 204 ? undefined as T : response.json();
+}
+
+export async function requestBlob(url: string, signal: AbortSignal) {
+  const response = await apiResponse(url, { signal });
+  const blob = await response.blob();
+  if (!blob.size) throw new Error('Сервер вернул пустой файл');
+  return blob;
 }
 
 export function save<T>(path: string, method: string, body?: unknown) {
