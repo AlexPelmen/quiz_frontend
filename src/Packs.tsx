@@ -108,6 +108,7 @@ export function Packs() {
       <Failure error={detail.error} /><p>{String(detail.data?.description || '')}</p>
       {detail.data && <div>{preparation(detail.data)}</div>}
       <Collapse items={detail.data?.rounds?.map(round => ({ key: round.id, label: `Раунд ${round.number} · ${ruleFor(round.type).name}`, children: round.questions.map(q => {
+        if (q.deleted) return <Card key={q.id} size="small" className="question" title={`${q.number}. ${q.primary_text}`} />;
         const hint = questionHint(q.secondary_text, round.type);
         return <Card key={q.id} size="small" className="question" title={`${q.number}. ${q.primary_text}`} extra={<PreparationStatus status={q.status} />}>
           {hint && <p style={{ whiteSpace: 'pre-line' }}>{hint}</p>}

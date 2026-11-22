@@ -50,6 +50,7 @@ async function prepareMedia(pack: QuizPack, files: Map<string, string>, signal: 
   const downloads = new Map<string, string>();
 
   await forEachConcurrent(questions, signal, async ({ question, roundType }) => {
+    if (question.deleted) return;
     const audio = question.sound_download_id ? questionAudioURL(pack.id, question.number) : undefined;
     const image = roundType === 'artist_by_cover' ? questionCoverURL(pack.id, question.number)
       : question.image_download_id ? fileURL(question.image_download_id) : undefined;

@@ -29,7 +29,8 @@ export interface QuizQuestion {
   id: string;
   number: number;
   status: QuizStatus;
-  artist_id: string;
+  deleted: boolean;
+  artist_id?: string;
   track_id: string | null;
   primary_text: string;
   secondary_text: string;

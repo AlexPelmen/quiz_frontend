@@ -5,7 +5,7 @@ import { date, fileURL, request, save } from './api';
 import { questionAudioURL, questionCoverURL, ruleFor } from './quiz';
 import { Failure, PageTitle, Refresh } from './shared';
 
-type Question = { id: string; pack_id: string; pack_name: string; number: number; round_type: string; primary_text: string; answer: string; has_audio: boolean; image_download_id: string | null; reports: number; unread: number; likes: number };
+type Question = { id: string; pack_id: string; pack_name: string; number: number; round_type: string; deleted: boolean; primary_text: string; answer: string; has_audio: boolean; image_download_id: string | null; reports: number; unread: number; likes: number };
 type Report = { id: string; question_id: string; user_id: string; user_name: string; type: string; comment: string; viewed: boolean; created_at: string; updated_at: string };
 const labels: Record<string, string> = { question_error: 'Ошибка в вопросе', bad_audio: 'Звук плохого качества', bug: 'Баг' };
 
@@ -43,10 +43,12 @@ export function Feedback() {
       {selected && <Space direction="vertical" size="middle" style={{ width: '100%' }}>
         <Typography.Title level={4}>{selected.primary_text}</Typography.Title>
         <Typography.Text>Пакет: {selected.pack_name} · {ruleFor(selected.round_type).name} · вопрос {selected.number}</Typography.Text>
-        <Typography.Text>Ответ: {selected.answer}</Typography.Text>
-        {selected.round_type === 'artist_by_cover' ? <img className="cover" src={questionCoverURL(selected.pack_id, selected.number)} alt="Обложка вопроса" />
-          : selected.image_download_id && <img className="cover" src={fileURL(selected.image_download_id)} alt="Изображение вопроса" />}
-        {selected.has_audio && <audio controls preload="none" src={questionAudioURL(selected.pack_id, selected.number)} />}
+        {!selected.deleted && <>
+          <Typography.Text>Ответ: {selected.answer}</Typography.Text>
+          {selected.round_type === 'artist_by_cover' ? <img className="cover" src={questionCoverURL(selected.pack_id, selected.number)} alt="Обложка вопроса" />
+            : selected.image_download_id && <img className="cover" src={fileURL(selected.image_download_id)} alt="Изображение вопроса" />}
+          {selected.has_audio && <audio controls preload="none" src={questionAudioURL(selected.pack_id, selected.number)} />}
+        </>}
         <Typography.Title level={5}>Жалобы</Typography.Title>
         <Failure error={reports.error || viewed.error} />
         {reports.isPending && <Typography.Text>Загружаем жалобы…</Typography.Text>}

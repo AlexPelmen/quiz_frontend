@@ -117,12 +117,13 @@ export function QuizPlayer() {
   const { state: packMedia, retry: retryMedia } = useQuizMedia(pack);
   const rounds = (pack?.rounds ?? []).filter(round => round.questions.length > 0);
   const total = rounds.reduce((sum, round) => sum + round.questions.length, 0);
+  const playable = rounds.reduce((sum, round) => sum + round.questions.filter(q => !q.deleted).length, 0);
   const step = game?.steps[game.index];
   const correct = step?.kind === 'finish' ? Object.values(game?.answers ?? {}).filter(Boolean).length : 0;
-  const score = quizScore(correct, total);
-  const question = step?.kind === 'question' ? step.question : null;
+  const score = quizScore(correct, playable);
+  const question = step?.kind === 'question' && !step.question.deleted ? step.question : null;
   const rule = step && step.kind !== 'finish' ? ruleFor(step.round.type) : null;
-  const hint = step?.kind === 'question' ? questionHint(step.question.secondary_text, step.round.type, step.question.answer) : '';
+  const hint = question && step?.kind === 'question' ? questionHint(question.secondary_text, step.round.type, question.answer) : '';
   const revealed = question !== null && (game?.revealed.has(question.id) ?? false);
   const marked = question ? game?.answers[question.id] : undefined;
   const result = step?.kind === 'result' ? game?.results[step.round.id] : undefined;
@@ -149,7 +150,7 @@ export function QuizPlayer() {
     if (next.kind === 'result' && !game.results[next.round.id]) {
       const answers: Record<string, boolean> = {};
       for (const q of next.round.questions) {
-        const answer = game.answers[q.id];
+        const answer = q.deleted ? false : game.answers[q.id];
         if (answer === undefined) return;
         answers[q.id] = answer;
       }
@@ -316,7 +317,9 @@ export function QuizPlayer() {
                 percent={Math.floor(completedFiles / packMedia.total * 100)} />
             </div>}
             {packMedia.status === 'error' && <Alert type="error" showIcon title="Не удалось подготовить пакет"
-              description={packMedia.message} action={<Button onClick={retryMedia}>Повторить</Button>} />}
+              description={packMedia.message} action={<Button loading={detail.isFetching} onClick={() => {
+                void detail.refetch().then(({ isSuccess }) => { if (isSuccess) retryMedia(); });
+              }}>Повторить</Button>} />}
             <Button size="large" type="primary" icon={<PlayCircleOutlined />} disabled={!total || packMedia.status !== 'ready'}
               onClick={() => {
                 if (packMedia.status !== 'ready') return;
@@ -346,46 +349,48 @@ export function QuizPlayer() {
             <Splash />
             <div className="mq-question-top">
               <div className="mq-kicker">ВОПРОС {numberLabel(step.position)} / {numberLabel(step.round.questions.length)}</div>
-              <Tag>{rule?.label}</Tag>
+              {question && <Tag>{rule?.label}</Tag>}
             </div>
             <Progress aria-label="Прогресс раунда" percent={step.position / step.round.questions.length * 100} showInfo={false} strokeColor="#b294ff" />
             <h1 ref={heading} tabIndex={-1}>{step.question.primary_text}</h1>
-            <p>{rule?.instructions}</p>
-            {revealed ? <><Splash answer /><QuizAnswer question={step.question} roundType={step.round.type} media={questionMedia?.answer} /></> : <>
-              {hint && <div className="mq-hint">{hint}</div>}
-              {questionMedia?.image && <QuizImage key={step.question.id} src={questionMedia.image} />}
-            </>}
-            {clip && <>
-              <div className="mq-audio">
-                <Button shape="circle" type="primary" size="large" aria-label={audio.playing ? 'Пауза' : 'Воспроизвести фрагмент'}
-                  icon={audio.playing ? <PauseOutlined /> : <PlayCircleFilled />} onClick={togglePlayback} />
-                <div className="mq-audio-body">
-                  <strong>Фрагмент трека</strong>
-                  <div className="mq-wave" aria-hidden="true" data-playing={audio.playing}>
-                    {wave.map((height, index) => <i key={index} style={{ height, animationDelay: `${index * -45}ms` }} />)}
+            {question && <>
+              <p>{rule?.instructions}</p>
+              {revealed ? <><Splash answer /><QuizAnswer question={question} roundType={step.round.type} media={questionMedia?.answer} /></> : <>
+                {hint && <div className="mq-hint">{hint}</div>}
+                {questionMedia?.image && <QuizImage key={question.id} src={questionMedia.image} />}
+              </>}
+              {clip && <>
+                <div className="mq-audio">
+                  <Button shape="circle" type="primary" size="large" aria-label={audio.playing ? 'Пауза' : 'Воспроизвести фрагмент'}
+                    icon={audio.playing ? <PauseOutlined /> : <PlayCircleFilled />} onClick={togglePlayback} />
+                  <div className="mq-audio-body">
+                    <strong>Фрагмент трека</strong>
+                    <div className="mq-wave" aria-hidden="true" data-playing={audio.playing}>
+                      {wave.map((height, index) => <i key={index} style={{ height, animationDelay: `${index * -45}ms` }} />)}
+                    </div>
                   </div>
+                  <span className="mq-time">{timeLabel(audio.elapsed)}{duration > 0 && ` / ${timeLabel(duration)}`}</span>
                 </div>
-                <span className="mq-time">{timeLabel(audio.elapsed)}{duration > 0 && ` / ${timeLabel(duration)}`}</span>
-              </div>
-              {audio.error && <Alert type="warning" showIcon title={audio.error} />}
+                {audio.error && <Alert type="warning" showIcon title={audio.error} />}
+              </>}
+              <QuestionFeedback key={question.id} questionID={question.id} />
+              <Button size="large" type={revealed ? 'default' : 'primary'} aria-expanded={revealed}
+                aria-controls={revealed ? 'mq-answer' : undefined}
+                icon={revealed ? <ArrowUpOutlined /> : <ArrowDownOutlined />} onClick={() => showAnswer(!revealed)}>
+                {revealed ? 'Скрыть ответ' : 'Показать ответ'}
+              </Button>
+              {revealed && <Space wrap size="middle" role="group" aria-label="Угадали ответ?">
+                <Button size="large" type={marked === true ? 'primary' : 'default'} aria-pressed={marked === true}
+                  disabled={!!game.results[step.round.id]} onClick={() => markAnswer(true)}>Угадали</Button>
+                <Button size="large" type={marked === false ? 'primary' : 'default'} aria-pressed={marked === false}
+                  disabled={!!game.results[step.round.id]} onClick={() => markAnswer(false)}>Не угадали</Button>
+              </Space>}
             </>}
-            <QuestionFeedback key={step.question.id} questionID={step.question.id} />
-            <Button size="large" type={revealed ? 'default' : 'primary'} aria-expanded={revealed}
-              aria-controls={revealed ? 'mq-answer' : undefined}
-              icon={revealed ? <ArrowUpOutlined /> : <ArrowDownOutlined />} onClick={() => showAnswer(!revealed)}>
-              {revealed ? 'Скрыть ответ' : 'Показать ответ'}
-            </Button>
-            {revealed && <Space wrap size="middle" role="group" aria-label="Угадали ответ?">
-              <Button size="large" type={marked === true ? 'primary' : 'default'} aria-pressed={marked === true}
-                disabled={!!game.results[step.round.id]} onClick={() => markAnswer(true)}>Угадали</Button>
-              <Button size="large" type={marked === false ? 'primary' : 'default'} aria-pressed={marked === false}
-                disabled={!!game.results[step.round.id]} onClick={() => markAnswer(false)}>Не угадали</Button>
-            </Space>}
           </section>}
 
           {step.kind === 'result' && result && <section className="mq-stage mq-round">
             <div className="mq-kicker">РАУНД {numberLabel(step.round.number)}</div>
-            <h1 ref={heading} tabIndex={-1}>Угадано {result.r} из {result.n}</h1>
+            <h1 ref={heading} tabIndex={-1}>Угадано {result.r} из {step.round.questions.filter(q => !q.deleted).length}</h1>
             {submission.isPending && <div className="mq-status" role="status"><Spin size="small" /> Сохраняем результат…</div>}
             {submission.isError && !resultSaved && <Alert type="error" showIcon title="Не удалось сохранить результат"
               description={submission.error.message} />}
@@ -401,7 +406,7 @@ export function QuizPlayer() {
             <div className="mq-round-symbol" aria-hidden="true">✦</div>
             <h1 ref={heading} tabIndex={-1}>{score.points} из 100 очков</h1>
             <p>Ваше звание — <strong>{score.rank}</strong></p>
-            <p>Угадано {correct} из {total} в квизе «{game.pack.name}».</p>
+            <p>Угадано {correct} из {playable} в квизе «{game.pack.name}».</p>
             <Button type="primary" size="large" icon={<UnorderedListOutlined />} onClick={goToCatalog}>К списку квизов</Button>
           </section>}
 
@@ -411,8 +416,8 @@ export function QuizPlayer() {
               {question && <><span><kbd>↓</kbd> Ответ</span><span><kbd>↑</kbd> Скрыть</span></>}
               {clip && <span><kbd>Пробел</kbd> Звук</span>}
             </span>
-            {step.kind === 'question' ? <Button type={marked === undefined ? 'default' : 'primary'}
-              disabled={marked === undefined} onClick={() => move(1)}
+            {step.kind === 'question' ? <Button type={question && marked === undefined ? 'default' : 'primary'}
+              disabled={!!question && marked === undefined} onClick={() => move(1)}
               icon={<ArrowRightOutlined />} iconPlacement="end">{lastQuestion ? 'Завершить раунд' : 'Следующий вопрос'}</Button>
               : <span />}
           </div>
