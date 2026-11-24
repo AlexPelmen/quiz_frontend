@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type RefObject } from 'react';
-import { Alert, AutoComplete, Button, Input, type GetRef } from 'antd';
+import { Alert, AutoComplete, Button, Input, Spin, type GetRef } from 'antd';
+import { ArrowRightOutlined } from '@ant-design/icons';
 import { useQuery } from '@tanstack/react-query';
 import { request } from '../api';
 import type { AnswerOption, AnswerType } from '../quiz';
@@ -57,18 +58,18 @@ export function QuizAnswerInput({ fieldRef, preferred, pending, error, onSubmit 
       if (event.key === 'Enter' && (event.nativeEvent.isComposing || event.keyCode === 229)) event.stopPropagation();
     }}>
     <div className="mq-answer-input">
-      <label htmlFor="mq-player-answer">Ваш ответ</label>
       <AutoComplete<string, Suggestion>
         ref={fieldRef}
         id="mq-player-answer"
         autoComplete="off"
-        aria-describedby={!draft.option ? 'mq-answer-select-hint' : undefined}
         size="large"
         value={draft.text}
         maxLength={1000}
-        placeholder={preferred === 'track' ? 'Введите название трека' : 'Введите имя исполнителя'}
+        placeholder="Ваш ответ"
         disabled={pending}
         options={options}
+        listHeight={220}
+        classNames={{ popup: { root: 'mq-answer-options' } }}
         virtual={false}
         showSearch={{ filterOption: false }}
         defaultActiveFirstOption={false}
@@ -80,13 +81,17 @@ export function QuizAnswerInput({ fieldRef, preferred, pending, error, onSubmit 
           if (!event.repeat) submit();
         }}
       >
-        <Input type="search" autoComplete="off" autoCorrect="off" autoCapitalize="none" spellCheck={false} />
+        <Input aria-label={preferred === 'track' ? 'Название трека' : 'Имя исполнителя'}
+          autoComplete="off" autoCorrect="off" autoCapitalize="none" spellCheck={false} />
       </AutoComplete>
+      {canSearch && matches.isFetching && <span className="mq-answer-loader" role="status" aria-label="Поиск вариантов">
+        <Spin size="small" />
+      </span>}
     </div>
-    <Button type="primary" size="large" htmlType="submit" disabled={!draft.option} loading={pending}>Ответить</Button>
-    {!draft.option && <p className="mq-answer-status" id="mq-answer-select-hint">Выберите вариант из списка.</p>}
-    {canSearch && matches.isFetching && <p className="mq-answer-status" role="status">Ищем варианты…</p>}
-    {canSearch && matches.isSuccess && !options.length && <p className="mq-answer-status" role="status">Совпадений нет. Попробуйте другое написание.</p>}
+    <Button className="mq-submit-answer" type="primary" size="large" htmlType="submit"
+      aria-label="Ответить" disabled={!draft.option} loading={pending}>
+      <span className="mq-submit-label">Ответить <kbd>Enter</kbd></span><ArrowRightOutlined className="mq-submit-arrow" />
+    </Button>
     {canSearch && matches.isError && <Alert type="warning" showIcon title="Не удалось загрузить варианты"
       action={<Button size="small" onClick={() => void matches.refetch()}>Повторить</Button>} />}
     {error && <Alert type="error" showIcon title="Не удалось отправить ответ" description={error.message} />}

@@ -9,6 +9,7 @@ export interface QuizPackSummary {
   status: QuizStatus;
   clips_total: number;
   clips_ready: number;
+  questions_total?: number;
   clip_error?: string;
   difficulty?: string;
   cover_download_id?: string | null;
@@ -59,6 +60,7 @@ export interface AnswerOption {
 export interface SubmittedAnswer {
   text: string;
   correct: boolean;
+  timed_out: boolean;
   question: QuizQuestion;
 }
 

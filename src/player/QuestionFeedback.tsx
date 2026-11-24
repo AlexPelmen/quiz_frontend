@@ -4,7 +4,7 @@ import { FlagOutlined, HeartFilled, HeartOutlined } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { request, save } from '../api';
 
-export function QuestionFeedback({ questionID }: { questionID: string }) {
+export function QuestionFeedback({ questionID, revealed }: { questionID: string; revealed: boolean }) {
   const [open, setOpen] = useState(false);
   const [form] = Form.useForm();
   const client = useQueryClient();
@@ -15,16 +15,18 @@ export function QuestionFeedback({ questionID }: { questionID: string }) {
   const report = useMutation({ mutationFn: (body: { type: string; comment: string }) => save<void>(`/questions/${questionID}/feedback`, 'POST', body),
     onSuccess: () => { setOpen(false); form.resetFields(); } });
   return <div className="mq-feedback">
-    <Space wrap>
-      <Button aria-pressed={!!like.data?.liked} disabled={!like.data || like.isError} loading={toggle.isPending}
-        icon={like.data?.liked ? <HeartFilled /> : <HeartOutlined />} onClick={() => toggle.mutate(!like.data?.liked)}>
-        {like.data?.liked ? 'Нравится' : 'Нравится вопрос'}
-      </Button>
-      <Button icon={<FlagOutlined />} onClick={() => { report.reset(); setOpen(true); }}>Пожаловаться</Button>
+    <Space className="mq-feedback-actions">
+      {revealed && <Button type="text" shape="circle" aria-label="Пожаловаться на вопрос" title="Пожаловаться на вопрос"
+        icon={<FlagOutlined />} onClick={() => { report.reset(); setOpen(true); }} />}
+      <Button shape="circle" className="mq-heart" aria-label="Нравится вопрос" title="Нравится вопрос"
+        aria-pressed={!!like.data?.liked} disabled={!like.data || like.isError} loading={toggle.isPending}
+        icon={like.data?.liked ? <HeartFilled /> : <HeartOutlined />} onClick={() => toggle.mutate(!like.data?.liked)} />
     </Space>
-    {(like.error || toggle.error) && <Alert showIcon type="error" title="Не удалось обновить лайк" description={(like.error || toggle.error)?.message} action={like.isError ? <Button size="small" onClick={() => void like.refetch()}>Повторить</Button> : undefined} />}
-    {report.isSuccess && !open && <span role="status">Спасибо, жалоба отправлена.</span>}
-    <Modal title="Пожаловаться на вопрос" open={open} onCancel={() => setOpen(false)} onOk={() => form.submit()}
+    {(like.error || toggle.error || (report.isSuccess && !open)) && <div className="mq-feedback-notices">
+      {(like.error || toggle.error) && <Alert showIcon type="error" title="Не удалось обновить лайк" description={(like.error || toggle.error)?.message} action={like.isError ? <Button size="small" onClick={() => void like.refetch()}>Повторить</Button> : undefined} />}
+      {report.isSuccess && !open && <span role="status">Спасибо, жалоба отправлена.</span>}
+    </div>}
+    <Modal className="mq-feedback-modal" title="Пожаловаться на вопрос" open={open} onCancel={() => setOpen(false)} onOk={() => form.submit()}
       okText="Отправить" cancelText="Отмена" confirmLoading={report.isPending}>
       {report.error && <Alert type="error" showIcon title="Не удалось отправить жалобу" description={report.error.message} />}
       <Form form={form} layout="vertical" onFinish={values => report.mutate(values)}>

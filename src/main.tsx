@@ -17,8 +17,8 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode><QueryClientProvider client={client}>
     <ConfigProvider locale={ruRU} theme={!isAdmin ? {
       algorithm: theme.darkAlgorithm,
-      token: { colorPrimary: '#d9ff66', colorBgBase: '#13101b', colorTextLightSolid: '#16121c', borderRadius: 12, fontFamily: 'Inter, Segoe UI, sans-serif' },
-      components: { Button: { primaryColor: '#16121c' }, Modal: { contentBg: '#21192c', headerBg: '#21192c' } },
+      token: { colorPrimary: '#c5ff00', colorBgBase: '#08080c', colorTextLightSolid: '#101216', borderRadius: 0, fontFamily: 'Inter, Segoe UI, sans-serif' },
+      components: { Button: { primaryColor: '#101216' }, Modal: { contentBg: '#111116', headerBg: '#111116' } },
     } : { token: { colorPrimary: '#6254d9', borderRadius: 10, fontFamily: 'Inter, Segoe UI, sans-serif' } }}>
       <AntApp><AuthGate>{isAdmin ? <App /> : <QuizPlayer />}</AuthGate></AntApp>
     </ConfigProvider>
