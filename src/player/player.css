@@ -247,9 +247,6 @@
 .mq-game-bar > span:not(.ant-tag) { overflow-wrap: anywhere; text-align: center; color: var(--dim); }
 .mq-game-bar > .ant-tag { flex: none; color: var(--lilac); }
 .mq-game-controls { margin: 17px auto 0; }
-.mq-key-hints { display: flex; flex-wrap: wrap; justify-content: center; gap: 5px 11px; color: var(--dim); font-size: 13px; }
-.mq-key-hints > span { white-space: nowrap; }
-.mq-key-hints kbd { display: inline-block; padding: 2px 6px; border: 1px solid #4a3b59; border-radius: 5px; background: #241b2e; font-family: var(--mono); }
 .mq-round { min-height: 380px; align-content: center; justify-items: center; text-align: center; }
 .mq-round > p { margin-bottom: 4px; }
 .mq-round-symbol {
@@ -296,6 +293,18 @@
 .mq-wave i { display: block; flex: 0 0 3px; border-radius: 4px; background: var(--lilac); transform: scaleY(.56); }
 .mq-wave[data-playing="true"] i { animation: mq-wave 540ms ease-in-out infinite alternate; }
 .mq-time { font: 700 12px/1.4 var(--mono); color: var(--dim); white-space: nowrap; }
+.mq-answer-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px 12px;
+  align-items: end;
+  width: min(100%, 560px);
+}
+.mq-answer-input { display: grid; gap: 6px; min-width: 0; }
+.mq-answer-input label { font-weight: 700; }
+.mq-answer-input .ant-select { width: 100%; }
+.mq-answer-form > .ant-alert, .mq-answer-status { grid-column: 1 / -1; }
+.mq-answer-status { margin: 0; color: var(--dim); font-size: 13px; }
 .mq-answer {
   width: 100%;
   overflow: hidden;
@@ -304,6 +313,7 @@
   background: #191321;
   animation: mq-in 220ms ease-out both;
 }
+.mq-answer > .ant-alert { border-radius: 0; overflow-wrap: anywhere; }
 .mq-answer-art {
   isolation: isolate;
   position: relative;
@@ -420,7 +430,7 @@
   .mq-sleeve { width: 37%; inset: 21% auto auto 28%; }
   .mq-pack-grid { grid-template-columns: 1fr; }
   .mq-pack-card .ant-card-body { padding: 15px; }
-  .mq-key-hints { display: none; }
+  .mq-answer-form { grid-template-columns: 1fr; }
   .mq-stage { border-radius: 17px; }
   .mq-game-bar > span:not(.ant-tag) { display: none; }
   .mq-round { min-height: 340px; }

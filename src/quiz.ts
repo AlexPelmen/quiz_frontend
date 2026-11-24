@@ -43,10 +43,23 @@ export interface QuizQuestion {
 }
 
 export interface RoundResult {
-  attempt_id: string;
   r: number;
   n: number;
-  answers: Record<string, boolean>;
+}
+
+export type AnswerType = 'artist' | 'album' | 'track';
+
+export interface AnswerOption {
+  id: string;
+  type: AnswerType;
+  name: string;
+  artist?: string;
+}
+
+export interface SubmittedAnswer {
+  text: string;
+  correct: boolean;
+  question: QuizQuestion;
 }
 
 export const difficultyLabels: Record<string, string> = { easy: 'Лёгкий', medium: 'Средний', hard: 'Сложный' };
@@ -74,10 +87,8 @@ export function questionName(value: string) {
   return result.replace(/[^\S\r\n]+/gu, ' ').replace(/^ +| +$/gmu, '').trim();
 }
 
-export function questionHint(text: string, roundType: string, answer?: string) {
+export function questionHint(text: string, roundType: string) {
   if (roundType === 'artist_cities' || roundType === 'artist_alphabet' || roundType === 'artist_growth') return '';
-  // В ранее созданных пакетах начальные A и An ошибочно пропускались.
-  if (roundType === 'artist_initial' && /^a(?:n)?\s+\S/iu.test(questionName(answer || ''))) return 'A/А';
   // В сохранённых пакетах согласные могли быть записаны как подчёркивания.
   text = questionName(text);
   return roundType === 'track_vowels' ? text.replaceAll('_', '').replace(/\s+/g, ' ').trim().toLowerCase() : text;

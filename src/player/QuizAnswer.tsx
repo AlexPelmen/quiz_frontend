@@ -1,11 +1,30 @@
 import { useEffect, useRef, useState } from 'react';
 import { CheckOutlined, CustomerServiceOutlined } from '@ant-design/icons';
+import { Alert } from 'antd';
 import { useQuery } from '@tanstack/react-query';
-import { request } from '../api';
-import { questionName, type QuizQuestion } from '../quiz';
-import type { AnswerMedia } from './useQuizMedia';
+import { fileURL, request } from '../api';
+import { questionName, type QuizQuestion, type SubmittedAnswer } from '../quiz';
 
 const labels: Record<string, string> = { artist: 'Исполнитель', track: 'Трек', album: 'Альбом', release: 'Релиз' };
+
+type AnswerMedia = { image?: string; fallback?: string; releaseDate?: string };
+
+async function answerMedia(question: QuizQuestion, isTrack: boolean, signal: AbortSignal): Promise<AnswerMedia> {
+  const { artist_id: artistId, track_id: trackId } = question;
+  const artist = artistId ? await request<{ logo_download_id: string | null; missing_fields?: string[] | null }>(
+    `/artists/${encodeURIComponent(artistId)}`, { signal },
+  ) : null;
+  const logo = artist?.missing_fields?.includes('logo') ? null : artist?.logo_download_id;
+  const logoURL = logo ? fileURL(logo) : undefined;
+  if (!isTrack || !trackId) return { image: logoURL };
+
+  const track = await request<{ album_id: string | null }>(`/tracks/${encodeURIComponent(trackId)}`, { signal });
+  const album = track.album_id ? await request<{ cover_download_id: string | null; release_date: string; missing_fields?: string[] | null }>(
+    `/albums/${encodeURIComponent(track.album_id)}`, { signal },
+  ) : null;
+  const cover = album?.missing_fields?.includes('cover') ? null : album?.cover_download_id;
+  return { image: cover ? fileURL(cover) : logoURL, fallback: cover && cover !== logo ? logoURL : undefined, releaseDate: album?.release_date };
+}
 
 function AnswerImage({ image, fallback, showBackdrop }: { image: string; fallback?: string; showBackdrop: boolean }) {
   const [failed, setFailed] = useState(false);
@@ -19,13 +38,22 @@ function AnswerImage({ image, fallback, showBackdrop }: { image: string; fallbac
     </>;
 }
 
-export function QuizAnswer({ question, roundType, media }: { question: QuizQuestion; roundType: string; media?: AnswerMedia }) {
+export function QuizAnswer({ answer, roundType, clueImage }: { answer: SubmittedAnswer; roundType: string; clueImage?: string }) {
+  const { question } = answer;
   const card = useRef<HTMLDivElement>(null);
   useEffect(() => {
+    card.current?.focus({ preventScroll: true });
     card.current?.scrollIntoView({ block: 'nearest' });
   }, []);
 
   const isTrack = roundType === 'track_vowels';
+  const logoClue = roundType === 'artist_by_logo' ? clueImage : undefined;
+  const mediaQuery = useQuery({
+    queryKey: ['quiz-answer-media', question.artist_id, isTrack ? question.track_id : null],
+    queryFn: ({ signal }) => answerMedia(question, isTrack, signal),
+    enabled: !logoClue,
+  });
+  const media = logoClue ? { image: logoClue } : mediaQuery.data;
   const contributors = useQuery({
     queryKey: ['track-artists', question.track_id],
     queryFn: ({ signal }) => request<{ id: string; name: string }[]>(`/tracks/${encodeURIComponent(question.track_id || '')}/artists`, { signal }),
@@ -46,7 +74,9 @@ export function QuizAnswer({ question, roundType, media }: { question: QuizQuest
     ),
   );
 
-  return <div className="mq-answer" id="mq-answer" ref={card}>
+  return <div className="mq-answer" id="mq-answer" ref={card} tabIndex={-1}>
+    <Alert type={answer.correct ? 'success' : 'error'} showIcon
+      title={answer.correct ? 'Правильно' : 'Неправильно'} description={`Ваш ответ: ${answer.text}`} />
     <div className="mq-answer-art" data-kind={isTrack ? 'track' : 'artist'}>
       <CustomerServiceOutlined className="mq-answer-placeholder" aria-hidden="true" />
       {media?.image && <AnswerImage key={media.image} image={media.image} fallback={media.fallback} showBackdrop={!isTrack} />}
@@ -55,6 +85,7 @@ export function QuizAnswer({ question, roundType, media }: { question: QuizQuest
         <h2>{!isTrack && displayedArtists ? displayedArtists : questionName(question.answer)}</h2>
       </div>
       {contributors.isError && <span className="mq-answer-image-error" role="status">Не удалось загрузить всех исполнителей трека</span>}
+      {mediaQuery.isError && <span className="mq-answer-image-error" role="status">Изображение недоступно</span>}
     </div>
     {facts.length > 0 && <dl>{facts.map(([key, value]) =>
       <div key={key}><dt>{labels[key] ?? key}</dt><dd>{String(value)}</dd></div>,

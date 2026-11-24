@@ -1,7 +1,8 @@
 import { useEffect, useEffectEvent, useRef, useState } from 'react';
-import { Alert, Button, Card, Empty, Image, Modal, Progress, Space, Spin, Tag } from 'antd';
+import { Alert, Button, Card, Empty, Image, Modal, Progress, Spin, Tag } from 'antd';
+import type { AutoComplete, GetRef } from 'antd';
 import {
-  ArrowDownOutlined, ArrowLeftOutlined, ArrowRightOutlined, ArrowUpOutlined,
+  ArrowDownOutlined, ArrowLeftOutlined, ArrowRightOutlined,
   CalendarOutlined, CustomerServiceOutlined, MutedOutlined, PauseOutlined,
   PlayCircleFilled, PlayCircleOutlined, ReloadOutlined, SoundOutlined, UnorderedListOutlined,
 } from '@ant-design/icons';
@@ -9,8 +10,9 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { fileURL, request, save } from '../api';
 import { useAuth } from '../Auth';
 import { difficultyLabels, questionHint, quizScore, ruleFor } from '../quiz';
-import type { QuizPack, QuizPackSummary, QuizQuestion, QuizRound, RoundResult } from '../quiz';
+import type { AnswerOption, QuizPack, QuizPackSummary, QuizQuestion, QuizRound, RoundResult, SubmittedAnswer } from '../quiz';
 import { QuizAnswer } from './QuizAnswer';
+import { QuizAnswerInput } from './QuizAnswerInput';
 import { QuestionFeedback } from './QuestionFeedback';
 import { useQuizAudio } from './useQuizAudio';
 import { useQuizMedia, type QuestionMedia } from './useQuizMedia';
@@ -43,8 +45,7 @@ type Game = {
   steps: Step[];
   index: number;
   attemptId: string;
-  revealed: Set<string>;
-  answers: Partial<Record<string, boolean>>;
+  answers: Partial<Record<string, SubmittedAnswer>>;
   results: Partial<Record<string, RoundResult>>;
   saved: Set<string>;
 };
@@ -90,16 +91,29 @@ export function QuizPlayer() {
   const media = useRef<HTMLAudioElement>(null);
   const audio = useQuizAudio(media);
   const heading = useRef<HTMLHeadingElement>(null);
+  const answerField = useRef<GetRef<typeof AutoComplete>>(null);
   const queryClient = useQueryClient();
   const submission = useMutation({
-    mutationFn: ({ roundId, result }: { roundId: string; result: RoundResult }) =>
-      save<void>(`/quiz-rounds/${encodeURIComponent(roundId)}/results`, 'POST', result),
-    onSuccess: (_, { roundId, result }) => {
-      setGame(current => current?.attemptId === result.attempt_id
+    mutationFn: ({ roundId, attemptId }: { roundId: string; attemptId: string }) =>
+      save<void>(`/quiz-rounds/${encodeURIComponent(roundId)}/results`, 'POST', { attempt_id: attemptId }),
+    onSuccess: (_, { roundId, attemptId }) => {
+      setGame(current => current?.attemptId === attemptId
         ? { ...current, saved: new Set([...current.saved, roundId]) } : current);
       for (const key of ['artists', 'albums', 'tracks', 'catalog-related']) {
         void queryClient.invalidateQueries({ queryKey: [key] });
       }
+    },
+  });
+  const answerSubmission = useMutation({
+    mutationFn: ({ questionId, attemptId, option }: { questionId: string; attemptId: string; option: AnswerOption }) =>
+      save<SubmittedAnswer>(`/questions/${encodeURIComponent(questionId)}/answer`, 'POST', {
+        attempt_id: attemptId,
+        option_id: option.id,
+        option_type: option.type,
+      }),
+    onSuccess: (answer, { questionId, attemptId }) => {
+      setGame(current => current?.attemptId === attemptId
+        ? { ...current, answers: { ...current.answers, [questionId]: answer } } : current);
     },
   });
 
@@ -110,7 +124,7 @@ export function QuizPlayer() {
   });
   const detail = useQuery({
     queryKey: ['quiz-pack', 'player', selected],
-    queryFn: () => request<QuizPack>(`/quiz-packs/${encodeURIComponent(selected ?? '')}?status=ready`),
+    queryFn: () => request<QuizPack>(`/quiz-packs/${encodeURIComponent(selected ?? '')}?play=1`),
     enabled: selected !== null && game === null,
   });
   const pack = game?.pack ?? detail.data;
@@ -119,13 +133,12 @@ export function QuizPlayer() {
   const total = rounds.reduce((sum, round) => sum + round.questions.length, 0);
   const playable = rounds.reduce((sum, round) => sum + round.questions.filter(q => !q.deleted).length, 0);
   const step = game?.steps[game.index];
-  const correct = step?.kind === 'finish' ? Object.values(game?.answers ?? {}).filter(Boolean).length : 0;
+  const correct = step?.kind === 'finish' ? Object.values(game?.answers ?? {}).filter(answer => answer?.correct).length : 0;
   const score = quizScore(correct, playable);
   const question = step?.kind === 'question' && !step.question.deleted ? step.question : null;
   const rule = step && step.kind !== 'finish' ? ruleFor(step.round.type) : null;
-  const hint = question && step?.kind === 'question' ? questionHint(question.secondary_text, step.round.type, question.answer) : '';
-  const revealed = question !== null && (game?.revealed.has(question.id) ?? false);
-  const marked = question ? game?.answers[question.id] : undefined;
+  const hint = question && step?.kind === 'question' ? questionHint(question.secondary_text, step.round.type) : '';
+  const submitted = question ? game?.answers[question.id] : undefined;
   const result = step?.kind === 'result' ? game?.results[step.round.id] : undefined;
   const resultSaved = step?.kind === 'result' && game?.saved.has(step.round.id);
   const questionMedia = question && game?.media.get(question.id);
@@ -134,48 +147,38 @@ export function QuizPlayer() {
   const screen = game ? `${game.pack.id}-${game.index}` : selected ? `pack-${selected}-${!!pack}` : 'catalog';
 
   useEffect(() => {
-    if (screen !== 'catalog' || document.activeElement === document.body) {
+    if (answerField.current) {
+      answerField.current.focus({ preventScroll: true });
+    } else if (screen !== 'catalog' || document.activeElement === document.body) {
       heading.current?.focus({ preventScroll: true });
     }
     window.scrollTo(0, 0);
   }, [screen]);
 
   function move(offset: number) {
-    if (!game || submission.isPending) return;
-    if (offset > 0 && ((question && marked === undefined) || (result && !resultSaved))) return;
+    if (!game || submission.isPending || answerSubmission.isPending) return;
+    if (offset > 0 && ((question && !submitted) || (result && !resultSaved))) return;
     const index = game.index + offset;
     const next = game.steps[index];
     if (!next) return;
+    answerSubmission.reset();
     const url = next.kind === 'question' ? game.media.get(next.question.id)?.audio ?? null : null;
     if (next.kind === 'result' && !game.results[next.round.id]) {
-      const answers: Record<string, boolean> = {};
-      for (const q of next.round.questions) {
-        const answer = q.deleted ? false : game.answers[q.id];
-        if (answer === undefined) return;
-        answers[q.id] = answer;
-      }
-      const result = { attempt_id: game.attemptId, n: next.round.questions.length,
-        r: Object.values(answers).filter(Boolean).length, answers };
+      const questions = next.round.questions.filter(q => !q.deleted);
+      if (questions.some(q => !game.answers[q.id])) return;
+      const result = { n: questions.length, r: questions.filter(q => game.answers[q.id]?.correct).length };
       audio.load(null);
       setGame({ ...game, index, results: { ...game.results, [next.round.id]: result } });
-      submission.mutate({ roundId: next.round.id, result });
+      submission.mutate({ roundId: next.round.id, attemptId: game.attemptId });
       return;
     }
     audio.load(url, sound === true);
     setGame({ ...game, index });
   }
 
-  function markAnswer(correct: boolean) {
-    if (!game || step?.kind !== 'question' || !revealed || game.results[step.round.id]) return;
-    setGame({ ...game, answers: { ...game.answers, [step.question.id]: correct } });
-  }
-
-  function showAnswer(open: boolean) {
-    if (!game || !question || revealed === open) return;
-    const answers = new Set(game.revealed);
-    if (open) answers.add(question.id);
-    else answers.delete(question.id);
-    setGame({ ...game, revealed: answers });
+  function submitAnswer(option: AnswerOption) {
+    if (!game || !question || submitted || answerSubmission.isPending) return;
+    answerSubmission.mutate({ questionId: question.id, attemptId: game.attemptId, option });
   }
 
   function togglePlayback() {
@@ -185,8 +188,9 @@ export function QuizPlayer() {
   }
 
   function goToCatalog() {
-    if (submission.isPending) return;
+    if (submission.isPending || answerSubmission.isPending) return;
     submission.reset();
+    answerSubmission.reset();
     audio.load(null);
     setGame(null);
     setSelected(null);
@@ -200,15 +204,22 @@ export function QuizPlayer() {
   }
 
   const onKeyDown = useEffectEvent((event: KeyboardEvent) => {
-    if (!game || sound === null || event.repeat || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey || event.defaultPrevented) return;
+    if (!game || sound === null || event.repeat || event.isComposing || event.keyCode === 229 ||
+      event.altKey || event.ctrlKey || event.metaKey || event.shiftKey || event.defaultPrevented) return;
     const target = event.target;
-    if (target instanceof HTMLElement && target.closest('input, textarea, select, [contenteditable="true"], [role="dialog"]')) return;
+    const element = target instanceof Element ? target : null;
+    if (element?.closest('input, textarea, select, [contenteditable="true"], [role="dialog"]')) return;
     if (event.key === 'ArrowRight' || event.key === 'ArrowLeft') {
       event.preventDefault();
       move(event.key === 'ArrowRight' ? 1 : -1);
-    } else if (question && (event.key === 'ArrowDown' || event.key === 'ArrowUp')) {
+      return;
+    }
+
+    if (element?.closest('button, a[href], [role="button"]')) return;
+    if (event.key === 'Enter' &&
+      (step?.kind === 'round' || (step?.kind === 'question' && (!question || submitted)) || resultSaved)) {
       event.preventDefault();
-      showAnswer(event.key === 'ArrowDown');
+      move(1);
     } else if (clip && event.code === 'Space') {
       event.preventDefault();
       togglePlayback();
@@ -324,7 +335,7 @@ export function QuizPlayer() {
               onClick={() => {
                 if (packMedia.status !== 'ready') return;
                 setGame({ pack, media: packMedia.questions, steps: gameSteps(rounds), index: 0, attemptId: crypto.randomUUID(),
-                  revealed: new Set(), answers: {}, results: {}, saved: new Set() });
+                  answers: {}, results: {}, saved: new Set() });
               }}>Начать</Button>
           </section>}
         </>}
@@ -355,7 +366,7 @@ export function QuizPlayer() {
             <h1 ref={heading} tabIndex={-1}>{step.question.primary_text}</h1>
             {question && <>
               <p>{rule?.instructions}</p>
-              {revealed ? <><Splash answer /><QuizAnswer question={question} roundType={step.round.type} media={questionMedia?.answer} /></> : <>
+              {submitted ? <><Splash answer /><QuizAnswer answer={submitted} roundType={step.round.type} clueImage={questionMedia?.image} /></> : <>
                 {hint && <div className="mq-hint">{hint}</div>}
                 {questionMedia?.image && <QuizImage key={question.id} src={questionMedia.image} />}
               </>}
@@ -374,30 +385,21 @@ export function QuizPlayer() {
                 {audio.error && <Alert type="warning" showIcon title={audio.error} />}
               </>}
               <QuestionFeedback key={question.id} questionID={question.id} />
-              <Button size="large" type={revealed ? 'default' : 'primary'} aria-expanded={revealed}
-                aria-controls={revealed ? 'mq-answer' : undefined}
-                icon={revealed ? <ArrowUpOutlined /> : <ArrowDownOutlined />} onClick={() => showAnswer(!revealed)}>
-                {revealed ? 'Скрыть ответ' : 'Показать ответ'}
-              </Button>
-              {revealed && <Space wrap size="middle" role="group" aria-label="Угадали ответ?">
-                <Button size="large" type={marked === true ? 'primary' : 'default'} aria-pressed={marked === true}
-                  disabled={!!game.results[step.round.id]} onClick={() => markAnswer(true)}>Угадали</Button>
-                <Button size="large" type={marked === false ? 'primary' : 'default'} aria-pressed={marked === false}
-                  disabled={!!game.results[step.round.id]} onClick={() => markAnswer(false)}>Не угадали</Button>
-              </Space>}
+              {!submitted && <QuizAnswerInput fieldRef={answerField} preferred={step.round.type === 'track_vowels' ? 'track' : 'artist'}
+                pending={answerSubmission.isPending} error={answerSubmission.error} onSubmit={submitAnswer} />}
             </>}
           </section>}
 
           {step.kind === 'result' && result && <section className="mq-stage mq-round">
             <div className="mq-kicker">РАУНД {numberLabel(step.round.number)}</div>
-            <h1 ref={heading} tabIndex={-1}>Угадано {result.r} из {step.round.questions.filter(q => !q.deleted).length}</h1>
+            <h1 ref={heading} tabIndex={-1}>Угадано {result.r} из {result.n}</h1>
             {submission.isPending && <div className="mq-status" role="status"><Spin size="small" /> Сохраняем результат…</div>}
             {submission.isError && !resultSaved && <Alert type="error" showIcon title="Не удалось сохранить результат"
               description={submission.error.message} />}
             {resultSaved ? <Button type="primary" size="large" onClick={() => move(1)}>
               {following?.kind === 'finish' ? 'Завершить квиз' : 'Следующий раунд'}
             </Button> : !submission.isPending && <Button type="primary" size="large"
-              onClick={() => submission.mutate({ roundId: step.round.id, result })}>Повторить сохранение</Button>}
+              onClick={() => submission.mutate({ roundId: step.round.id, attemptId: game.attemptId })}>Повторить сохранение</Button>}
           </section>}
 
           {step.kind === 'finish' && <section className="mq-stage mq-round mq-finish">
@@ -411,15 +413,12 @@ export function QuizPlayer() {
           </section>}
 
           <div className="mq-game-controls">
-            <Button icon={<ArrowLeftOutlined />} disabled={game.index === 0 || submission.isPending} onClick={() => move(-1)}>Назад</Button>
-            <span className="mq-key-hints"><span><kbd>←</kbd> <kbd>→</kbd> Навигация</span>
-              {question && <><span><kbd>↓</kbd> Ответ</span><span><kbd>↑</kbd> Скрыть</span></>}
-              {clip && <span><kbd>Пробел</kbd> Звук</span>}
-            </span>
-            {step.kind === 'question' ? <Button type={question && marked === undefined ? 'default' : 'primary'}
-              disabled={!!question && marked === undefined} onClick={() => move(1)}
+            <Button icon={<ArrowLeftOutlined />} disabled={game.index === 0 || submission.isPending || answerSubmission.isPending}
+              onClick={() => move(-1)}>Назад</Button>
+            {step.kind === 'question' && <Button type={question && !submitted ? 'default' : 'primary'}
+              disabled={!!question && !submitted} onClick={() => move(1)}
               icon={<ArrowRightOutlined />} iconPlacement="end">{lastQuestion ? 'Завершить раунд' : 'Следующий вопрос'}</Button>
-              : <span />}
+            }
           </div>
         </>}
       </div>
