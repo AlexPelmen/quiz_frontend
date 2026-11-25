@@ -7,8 +7,8 @@ import { Failure, PageTitle, Refresh, useAction } from './shared';
 
 export interface TagOption { id: string; name: string }
 
-export function useTags() {
-  return useQuery({ queryKey: ['tags'], queryFn: ({ signal }) => request<TagOption[]>('/tags', { signal }) });
+export function useTags(enabled = true) {
+  return useQuery({ queryKey: ['tags'], enabled, queryFn: ({ signal }) => request<TagOption[]>('/tags', { signal }) });
 }
 
 export function Tags() {

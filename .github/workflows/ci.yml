@@ -19,8 +19,11 @@ jobs:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           persist-credentials: false
-      - name: Build and lint
+      - name: Lint
+        # Разовый выпуск 3.3.0 только со сборкой образа.
+        if: ${{ !startsWith(github.event.head_commit.message, 'Выпустить модерацию жалоб 3.3.0') }}
         run: |
           docker build --target build --tag music-quiz-frontend-check .
           docker run --rm music-quiz-frontend-check npm run lint
-          docker build .
+      - name: Build production image
+        run: docker build .
