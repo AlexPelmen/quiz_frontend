@@ -9,7 +9,17 @@ type Context = { user: Account; can: (section: string) => boolean; logout: () =>
 const AuthContext = createContext<Context | null>(null);
 export function useAuth() { const value = useContext(AuthContext); if (!value) throw new Error('Нет данных пользователя'); return value; }
 
-export function AuthGate({ children }: { children: ReactNode }) {
+function PlayerSignIn({ children }: { children: ReactNode }) {
+  return <main className="mq mq-auth">
+    <section className="mq-auth-content" aria-labelledby="mq-auth-title">
+      <div className="mq-brand mq-auth-brand" role="img" aria-label="Music Quiz">MUSIC<span className="mq-brand-accent">QUIZ</span></div>
+      <h1 id="mq-auth-title">Вход</h1>
+      {children}
+    </section>
+  </main>;
+}
+
+export function AuthGate({ children, player }: { children: ReactNode; player: boolean }) {
   const client = useQueryClient();
   const [loginError, setLoginError] = useState('');
   const [expired, setExpired] = useState(false);
@@ -22,16 +32,25 @@ export function AuthGate({ children }: { children: ReactNode }) {
   const login = useMutation({ mutationFn: (body: { login: string; password: string }) => save<Account>('/auth/login', 'POST', body),
     onSuccess: () => { client.clear(); location.reload(); }, onError: error => setLoginError(error.message) });
   const logout = useMutation({ mutationFn: () => save<void>('/auth/logout', 'POST'), onSuccess: () => { client.clear(); location.reload(); } });
-  if (me.isPending && !expired) return <div style={{ padding: 32 }}><Spin /></div>;
-  if (!expired && me.error && (!(me.error instanceof ApiError) || me.error.status !== 401)) return <div style={{ maxWidth: 420, margin: '10vh auto', padding: 16 }}><Failure error={me.error} /><Button onClick={() => void me.refetch()}>Повторить</Button></div>;
-  if (!me.data || expired) return <div style={{ maxWidth: 420, margin: '10vh auto', padding: 16 }}><Card title="Вход в Music Quiz">
-    {loginError && <Alert type="error" showIcon title={loginError} />}
-    <Form layout="vertical" onFinish={values => login.mutate(values)}>
-      <Form.Item label="Логин" name="login" rules={[{ required: true }]}><Input autoComplete="username" /></Form.Item>
-      <Form.Item label="Пароль" name="password" rules={[{ required: true }]}><Input.Password autoComplete="current-password" /></Form.Item>
-      <Button type="primary" htmlType="submit" loading={login.isPending}>Войти</Button>
-    </Form>
-  </Card></div>;
+  if (me.isPending && !expired) {
+    const loading = <Spin aria-label="Проверяем вход" />;
+    return player ? <main className="mq mq-auth">{loading}</main> : <div style={{ padding: 32 }}>{loading}</div>;
+  }
+  if (!expired && me.error && (!(me.error instanceof ApiError) || me.error.status !== 401)) {
+    const retry = <><Failure error={me.error} /><Button onClick={() => void me.refetch()}>Повторить</Button></>;
+    return player ? <PlayerSignIn>{retry}</PlayerSignIn> : <div style={{ maxWidth: 420, margin: '10vh auto', padding: 16 }}>{retry}</div>;
+  }
+  if (!me.data || expired) {
+    const form = <>
+      {loginError && <Alert type="error" showIcon title={loginError} />}
+      <Form layout="vertical" requiredMark={player ? false : undefined} onFinish={values => login.mutate(values)}>
+        <Form.Item label="Логин" name="login" rules={[{ required: true }]}><Input autoComplete="username" /></Form.Item>
+        <Form.Item label="Пароль" name="password" rules={[{ required: true }]}><Input.Password autoComplete="current-password" /></Form.Item>
+        <Button block={player} type="primary" htmlType="submit" loading={login.isPending}>Войти</Button>
+      </Form>
+    </>;
+    return player ? <PlayerSignIn>{form}</PlayerSignIn> : <div style={{ maxWidth: 420, margin: '10vh auto', padding: 16 }}><Card title="Вход в Music Quiz">{form}</Card></div>;
+  }
   const user = me.data;
   const can = (section: string) => user.role === 'admin' || section === 'profile' || section === 'player'
     || user.role === 'moderator' && section === 'album-guessing' || ['parsing-logs', 'parsing-errors'].includes(section) && user.permissions.includes('parsing') || user.permissions.includes(section);

@@ -2,8 +2,7 @@ import { useEffect, useEffectEvent, useRef, useState } from 'react';
 import { Alert, Button, Empty, Image, Modal, Progress, Spin, Tag } from 'antd';
 import type { AutoComplete, GetRef } from 'antd';
 import {
-  ArrowLeftOutlined, ArrowRightOutlined, CustomerServiceOutlined, LogoutOutlined, MutedOutlined, PauseOutlined,
-  PlayCircleFilled, SoundOutlined, UserOutlined,
+  ArrowLeftOutlined, ArrowRightOutlined, LogoutOutlined, MutedOutlined, SoundOutlined, UserOutlined,
 } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { fileURL, request, save } from '../api';
@@ -22,6 +21,11 @@ const clipSeconds = 30;
 const tickSeconds = 5;
 const questionSeconds = clipSeconds + tickSeconds;
 const countdownTicks = new URL('./countdown-ticks.mp3', import.meta.url).href;
+const defaultPackCovers = [
+  new URL('./covers/vinyl.webp', import.meta.url).href,
+  new URL('./covers/soundwave.webp', import.meta.url).href,
+  new URL('./covers/cassette.webp', import.meta.url).href,
+];
 
 type Step =
   | { kind: 'round'; round: QuizRound }
@@ -53,30 +57,39 @@ type Game = {
 
 const numberLabel = (number: number) => String(number).padStart(2, '0');
 const questionPlural = new Intl.PluralRules('ru');
+const packDateFormat = new Intl.DateTimeFormat('ru-RU', { dateStyle: 'medium' });
 
-function Tags({ tags }: { tags: QuizPackSummary['tags'] }) {
-  return tags?.length ? <span className="mq-tags">{tags.map((tag, index) => <Tag key={`${tag}-${index}`}>{tag}</Tag>)}</span> : null;
+function PackTags({ pack }: { pack: QuizPackSummary }) {
+  const difficulty = pack.difficulty === 'easy' || pack.difficulty === 'hard' ? pack.difficulty : 'medium';
+  return <span className="mq-tags">
+    <Tag className="mq-difficulty" data-difficulty={difficulty}>{difficultyLabels[difficulty]}</Tag>
+    {pack.tags?.map((tag, index) => <Tag key={`${tag}-${index}`}>{tag}</Tag>)}
+  </span>;
+}
+
+function PackCover({ pack, className }: { pack: QuizPackSummary; className: string }) {
+  const [failedCover, setFailedCover] = useState<string>();
+  const cover = pack.cover_download_id;
+  const digit = Number.parseInt(pack.id.slice(-1), 16);
+  const fallback = defaultPackCovers[(Number.isNaN(digit) ? 0 : digit) % defaultPackCovers.length];
+  const uploadedCover = cover && cover !== failedCover ? cover : undefined;
+  return <img className={className} src={uploadedCover ? fileURL(uploadedCover) : fallback} alt="" loading="lazy"
+    onError={uploadedCover ? () => setFailedCover(uploadedCover) : undefined} />;
 }
 
 function PackRow({ pack, onOpen }: { pack: QuizPackSummary; onOpen: () => void }) {
-  const [failedCover, setFailedCover] = useState<string>();
-  const cover = pack.cover_download_id;
-  const difficulty = pack.difficulty === 'easy' || pack.difficulty === 'hard' ? pack.difficulty : 'medium';
   const count = pack.questions_total;
   const plural = count === undefined ? undefined : questionPlural.select(count);
-  return <Button block className="mq-pack-row" onClick={onOpen}
-    icon={<ArrowRightOutlined />} iconPlacement="end">
-    <span className="mq-pack-art">
-      {cover && cover !== failedCover ? <img src={fileURL(cover)} alt="" loading="lazy" onError={() => setFailedCover(cover)} />
-        : <CustomerServiceOutlined aria-hidden="true" />}
-    </span>
+  const created = Date.parse(pack.created_at);
+  return <Button block className="mq-pack-row" onClick={onOpen}>
+    <PackCover pack={pack} className="mq-pack-cover" />
     <span className="mq-pack-copy">
       <strong>{pack.name}</strong>
       <span className="mq-pack-meta">
         {count !== undefined && <span>{count} {plural === 'one' ? 'вопрос' : plural === 'few' ? 'вопроса' : 'вопросов'}</span>}
-        <Tag className="mq-difficulty" data-difficulty={difficulty}>{difficultyLabels[difficulty]}</Tag>
+        {Number.isFinite(created) && <time dateTime={pack.created_at}>{packDateFormat.format(created)}</time>}
       </span>
-      <Tags tags={pack.tags} />
+      <PackTags pack={pack} />
     </span>
   </Button>;
 }
@@ -356,10 +369,9 @@ export function QuizPlayer() {
             action={<Button onClick={() => void detail.refetch()}>Повторить</Button>} />}
           {pack && <section className="mq-stage mq-detail">
             <h1 ref={heading} tabIndex={-1}>{pack.name}</h1>
-            {pack.cover_download_id && <img className="mq-detail-cover" src={fileURL(pack.cover_download_id)} alt="Обложка пакета" />}
-            <Tag className="mq-difficulty" data-difficulty={pack.difficulty ?? 'medium'}>{difficultyLabels[pack.difficulty ?? 'medium']}</Tag>
+            <PackCover pack={pack} className="mq-detail-cover" />
+            <PackTags pack={pack} />
             {pack.description && <p>{pack.description}</p>}
-            <Tags tags={pack.tags} />
             <div className="mq-pack-stats">
               <span>Раунды <strong>{rounds.length}</strong></span>
               <span>Вопросы <strong>{total}</strong></span>
@@ -409,9 +421,6 @@ export function QuizPlayer() {
             {!submitted && <h1 className="mq-question-title" ref={heading} tabIndex={-1}>{step.question.primary_text}</h1>}
             {question && <div className="mq-question-time" data-compact={showingClue}>
               {!revealed && <QuestionTimer remaining={remaining} label={countdownLabel} />}
-              {!revealed && !!clip && <Button shape="circle" className="mq-playback"
-                disabled={audioSource !== clip} aria-label={audio.playing && audioSource === clip ? 'Пауза' : 'Воспроизвести фрагмент'}
-                icon={audio.playing && audioSource === clip ? <PauseOutlined /> : <PlayCircleFilled />} onClick={togglePlayback} />}
               <QuestionFeedback questionID={question.id} revealed={revealed} />
             </div>}
             {submitted ? <QuizAnswer answer={submitted} headingRef={heading} roundType={step.round.type} clueImage={questionMedia?.image} />
@@ -428,7 +437,7 @@ export function QuizPlayer() {
                 {audio.error && <Alert className="mq-question-error" type="warning" showIcon title={audio.error} />}
               </div>}
             {(!question || revealed) && <Button className="mq-next-question" size="large" type="primary" onClick={() => move(1)}>
-              {lastQuestion ? 'Завершить раунд' : 'Следующий вопрос'} <kbd>Enter</kbd>
+              {lastQuestion ? 'Завершить раунд' : 'Следующий вопрос'}
             </Button>}
           </section>}
 

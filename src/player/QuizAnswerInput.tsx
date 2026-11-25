@@ -90,7 +90,7 @@ export function QuizAnswerInput({ fieldRef, preferred, pending, error, onSubmit 
     </div>
     <Button className="mq-submit-answer" type="primary" size="large" htmlType="submit"
       aria-label="Ответить" disabled={!draft.option} loading={pending}>
-      <span className="mq-submit-label">Ответить <kbd>Enter</kbd></span><ArrowRightOutlined className="mq-submit-arrow" />
+      <span className="mq-submit-label">Ответить</span><ArrowRightOutlined className="mq-submit-arrow" />
     </Button>
     {canSearch && matches.isError && <Alert type="warning" showIcon title="Не удалось загрузить варианты"
       action={<Button size="small" onClick={() => void matches.refetch()}>Повторить</Button>} />}
